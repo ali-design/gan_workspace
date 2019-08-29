@@ -157,6 +157,9 @@ if opt.netG != '':
     netG.load_state_dict(torch.load(opt.netG))
 print(netG)
 
+def get_target_np(outputs_zs, alpha, show_img=False, show_mask=False):
+    pass
+
 
 class Discriminator(nn.Module):
     def __init__(self, ngpu):
@@ -234,7 +237,7 @@ for epoch in range(opt.niter):
         label.fill_(fake_label)
         output = netD(fake.detach())
         errD_fake = criterion(output, label)
-        errD_fake.backward()    
+        errD_fake.backward()
 
         # train with fake new: z_new = z + alpha * w
         alpha = torch.randint(-5, 5, [batch_size, 1], device=devive)
