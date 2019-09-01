@@ -52,6 +52,31 @@ cudnn.benchmark = True
 if torch.cuda.is_available() and not opt.cuda:
     print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
+
+## Custom transform for randomly shift the image 1-6 pixel to left/right
+class RandomShift(object):
+	def __init__(self, threshold):
+      	# fraction of data which will be shifted
+        self.threshold = threshold
+    
+    def __call__(self, img):
+      	# num of shift pixel
+      	n_pixel = random.randint(1, 6)
+    	if random.random() > self.threshold:
+        	# Shift the img left/right
+            img_shift = np.zeros_like(img)
+            if random.random() > 0.5:
+            	#left
+                img_shift[:,:-n_pixel] = img[:,n_pixel:]
+            else:
+            	#right
+                img_shift[:,n_pixel:] = img[:,:-n_pixel]
+                
+        	return img_shift
+            
+        return img
+
+
 if opt.dataset in ['imagenet', 'folder', 'lfw']:
     # folder dataset
     dataset = dset.ImageFolder(root=opt.dataroot,
@@ -81,9 +106,18 @@ elif opt.dataset == 'cifar10':
                            ]))
     nc=3
 
+# elif opt.dataset == 'mnist':
+#         dataset = dset.MNIST(root=opt.dataroot, download=True,
+#                            transform=transforms.Compose([
+#                                transforms.Resize(opt.imageSize),
+#                                transforms.ToTensor(),
+#                                transforms.Normalize((0.5,), (0.5,)),
+#                            ]))
+#         nc=1
 elif opt.dataset == 'mnist':
         dataset = dset.MNIST(root=opt.dataroot, download=True,
                            transform=transforms.Compose([
+                               RandomShift(1./6),
                                transforms.Resize(opt.imageSize),
                                transforms.ToTensor(),
                                transforms.Normalize((0.5,), (0.5,)),
@@ -142,8 +176,21 @@ class Generator(nn.Module):
             nn.Tanh()
             # state size. (nc) x 64 x 64
         )
+        
+        # Define the walk as a parameter in G
+        self.W = nn.Parameter(torch.randn([1, nz]))
+        
+    def forward(self, z, alpha):
+        # Output for z
+		output = self._forward(z)
+        
+        # Output for z_new
+        z_new = z + alpha * self.W
+        output_new = self._forward(z_new)
+        
+        return output, output_new
 
-    def forward(self, input):
+    def _forward(self, input):
         if input.is_cuda and self.ngpu > 1:
             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
@@ -158,7 +205,28 @@ if opt.netG != '':
 print(netG)
 
 def get_target_np(outputs_zs, alpha, show_img=False, show_mask=False):
-    pass
+    target_fn = outputs_zs.clone().detach().data.cpu().numpy()
+    mask_fn = np.ones(target_fn.shape)
+    
+    for i in range(outputs_zs.shape[0]):
+        if alpha[i,0] !=0:
+            M = np.float32([[1,0,alpha[i,0]],[0,1,0]])
+            ## What is self.img_size? You should add this to the code
+            target_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(outputs_zs[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
+            mask_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(mask_fn[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
+
+    mask_fn[np.nonzero(mask_fn)] = 1.
+    assert(np.setdiff1d(mask_fn, [0., 1.]).size == 0)
+        
+    if show_img:
+        print('Target image:')
+        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=11))
+
+    if show_mask:
+        print('Target mask:')
+        self.imshow(self.imgrid(np.uint8(mask_fn*255), cols=11))
+
+    return torch.tensor(target_fn, requires_grad=True), torch.tensor(mask_fn requires_grad=True)
 
 
 class Discriminator(nn.Module):
@@ -231,58 +299,39 @@ for epoch in range(opt.niter):
         errD_real.backward()
         D_x = output.mean().item()
 
-        # train with fake
+        # train with fake and fake new
         noise = torch.randn(batch_size, nz, 1, 1, device=device)
-        fake = netG(noise)
+        alpha = torch.randint(-5, 5, [batch_size, 1], device=device)
+        
+        fake, fake_new = netG(noise, alpha)
         label.fill_(fake_label)
-        output = netD(fake.detach())
-        errD_fake = criterion(output, label)
+        output, output_new = netD(fake.detach()), netD(fake_new.detach())
+        errD_fake = 0.5 * (criterion(output, label) + criterion(output_new, label)
         errD_fake.backward()
 
-        # train with fake new: z_new = z + alpha * w
-        alpha = torch.randint(-5, 5, [batch_size, 1], device=devive)
-        z_new = noise + alpha * W
-        fake_new = netG(z_new.detach())
-        output = netD(fake_new.detach())
-        errD_fake_new = criterion(output, label)
-        errD_fake_new.backward()
-
         D_G_z1 = output.mean().item()
-        errD = errD_real + errD_fake + errD_fake_new
+        errD = errD_real + errD_fake 
         optimizerD.step()
 
         ############################
         # (2) Update G network: maximize log(D(G(z)))
         ###########################
+        # Loss G for both fake and fake new
         netG.zero_grad()
         label.fill_(real_label)  # fake labels are real for generator cost
-        output = netD(fake)
-        errG = criterion(output, label)
+        output, output_new = netD(fake), netD(fake_new)
+        errG = 0.5 * (criterion(output, label) + criterion(output_new, label))
         errG.backward()
 
-        output = netD(fake_new)
-        errG_new = criterion(output, label)
-        errG_new.backward()
-
+        # Loss of walk
         ## Need work
-        target, mask = get_target_np(fake)
+        target, mask = get_target_np(fake, alpha)
         walk_loss = mse_criterion(mask*fake_new, mask*target)
         walk_loss.backward()
 
-        errG = errG + errG_new + walk_loss
+        errG = errG + walk_loss
         D_G_z2 = output.mean().item()
         optimizerG.step()
-
-        ############################
-        # (3) Update walk W
-        ###########################
-        W.grad.zero_()
-        fake_new = netG(z_new)
-        walk_loss = mse_criterion(mask*fake_new, mask*target)
-
-        walk_loss.backward()
-        optimizerW.step()
-
 
         print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
               % (epoch, opt.niter, i, len(dataloader),
