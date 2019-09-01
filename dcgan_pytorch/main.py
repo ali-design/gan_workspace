@@ -55,24 +55,24 @@ if torch.cuda.is_available() and not opt.cuda:
 
 ## Custom transform for randomly shift the image 1-6 pixel to left/right
 class RandomShift(object):
-	def __init__(self, threshold):
-      	# fraction of data which will be shifted
+    def __init__(self, threshold):
+        # fraction of data which will be shifted
         self.threshold = threshold
-    
+
     def __call__(self, img):
-      	# num of shift pixel
-      	n_pixel = random.randint(1, 6)
-    	if random.random() > self.threshold:
-        	# Shift the img left/right
+        # num of shift pixel
+        n_pixel = random.randint(1, 6)
+        if random.random() > self.threshold:
+            # Shift the img left/right
             img_shift = np.zeros_like(img)
             if random.random() > 0.5:
-            	#left
+                #left
                 img_shift[:,:-n_pixel] = img[:,n_pixel:]
             else:
-            	#right
+                #right
                 img_shift[:,n_pixel:] = img[:,:-n_pixel]
                 
-        	return img_shift
+            return img_shift
             
         return img
 
@@ -182,12 +182,12 @@ class Generator(nn.Module):
         
     def forward(self, z, alpha):
         # Output for z
-		output = self._forward(z)
-        
+        output = self._forward(z)
+
         # Output for z_new
         z_new = z + alpha * self.W
         output_new = self._forward(z_new)
-        
+
         return output, output_new
 
     def _forward(self, input):
@@ -306,7 +306,7 @@ for epoch in range(opt.niter):
         fake, fake_new = netG(noise, alpha)
         label.fill_(fake_label)
         output, output_new = netD(fake.detach()), netD(fake_new.detach())
-        errD_fake = 0.5 * (criterion(output, label) + criterion(output_new, label)
+        errD_fake = 0.5 * (criterion(output, label) + criterion(output_new, label))
         errD_fake.backward()
 
         D_G_z1 = output.mean().item()
