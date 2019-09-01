@@ -226,7 +226,7 @@ def get_target_np(outputs_zs, alpha, show_img=False, show_mask=False):
         print('Target mask:')
         self.imshow(self.imgrid(np.uint8(mask_fn*255), cols=11))
 
-    return torch.tensor(target_fn, requires_grad=True), torch.tensor(mask_fn requires_grad=True)
+    return torch.tensor(target_fn, requires_grad=True), torch.tensor(mask_fn, requires_grad=True)
 
 
 class Discriminator(nn.Module):
