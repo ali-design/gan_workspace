@@ -159,9 +159,9 @@ class RandomShift(object):
                 #right
                 img_shift[:,n_pixel:] = img[:,:-n_pixel]
                 
-            return Image.fromarray(img_shift)
+            return PIL.Image.fromarray(img_shift)
             
-        return Image.fromarray(img)
+        return PIL.Image.fromarray(img)
 
 
 if opt.dataset in ['imagenet', 'folder', 'lfw']:
