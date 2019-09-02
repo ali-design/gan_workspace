@@ -69,7 +69,7 @@ def imgrid(imarray, cols=5, pad=1):
   return grid
   
 
-def get_target_np(outputs_zs, alpha, show_img=True, show_mask=True):
+def get_target_np(outputs_zs, alpha, show_img=False, show_mask=False):
     target_fn = outputs_zs.clone().detach().data.cpu().numpy()
     
 #     print('target_fn type and shape:', type(target_fn), target_fn.shape)
