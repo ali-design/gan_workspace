@@ -403,6 +403,8 @@ for epoch in range(opt.niter):
         # Loss of walk
         ## Need work
         target, mask = get_target_np(fake, alpha)
+        target = target.to(device)
+        mask = mask.to(device)
         walk_loss = mse_criterion(mask*fake_new, mask*target)
         walk_loss.backward()
 
