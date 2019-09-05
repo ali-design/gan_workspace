@@ -104,7 +104,7 @@ parser.add_argument('--dataset', required=True, help='cifar10 | lsun | mnist |im
 parser.add_argument('--dataroot', required=True, help='path to dataset')
 parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
 parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
-parser.add_argument('--imageSize', type=int, default=28, help='the height / width of the input image to network')
+parser.add_argument('--imageSize', type=int, default=64, help='the height / width of the input image to network')
 parser.add_argument('--nz', type=int, default=100, help='size of the latent z vector')
 parser.add_argument('--ngf', type=int, default=64)
 parser.add_argument('--ndf', type=int, default=64)
@@ -120,10 +120,6 @@ parser.add_argument('--manualSeed', type=int, help='manual seed')
 parser.add_argument('--classes', default='bedroom', help='comma separated list of classes for the lsun data set')
 
 opt = parser.parse_args()
-
-if opt.dataset == 'mnist':
-    opt.imageSize = 28
-
 print(opt)
 
 try:
@@ -257,23 +253,23 @@ class Generator(nn.Module):
         self.ngpu = ngpu
         self.main = nn.Sequential(
             # input is Z, going into a convolution
-            nn.ConvTranspose2d(     nz, ngf * 4, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 4),
+            nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(ngf * 8),
             nn.ReLU(True),
             # state size. (ngf*8) x 4 x 4
-            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 1, 0, bias=False),
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 4),
+            nn.ReLU(True),
+            # state size. (ngf*4) x 8 x 8
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
-            # state size. (ngf*4) x 7 x 7
-            nn.ConvTranspose2d(ngf * 2, ngf * 1, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 1),
+            # state size. (ngf*2) x 16 x 16
+            nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf),
             nn.ReLU(True),
-            # state size. (ngf*2) x 14 x 14
-            nn.ConvTranspose2d(ngf * 1,     nc, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(nc),
-            nn.ReLU(True),
-            # state size. (ngf) x 28 x 28
-#             nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
+            # state size. (ngf) x 32 x 32
+            nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
             nn.Tanh()
             # state size. (nc) x 64 x 64
         )
@@ -289,7 +285,6 @@ class Generator(nn.Module):
         z_new = z + torch.unsqueeze(torch.unsqueeze(alpha, 2), 3) * self.W
 #         print(z.size(), alpha.size(), self.W.size(), z_new.size())
         output_new = self._forward(z_new)
-#         print('G',output.size())
 
         return output, output_new
 
@@ -306,23 +301,23 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.ngpu = ngpu
         self.main = nn.Sequential(
-            # input is (nc) x 28 x 28
+            # input is (nc) x 64 x 64
             nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf) x 14 x 14
+            # state size. (ndf) x 32 x 32
             nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 2),
             nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*2) x 7 x 7
+            # state size. (ndf*2) x 16 x 16
             nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 4),
             nn.LeakyReLU(0.2, inplace=True),
-#             # state size. (ndf*4) x 8 x 8
-#             nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-#             nn.BatchNorm2d(ndf * 8),
-#             nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*4) x 3 x 3
-            nn.Conv2d(ndf * 4, 1, 3, 1, 0, bias=False),
+            # state size. (ndf*4) x 8 x 8
+            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf*8) x 4 x 4
+            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
             nn.Sigmoid()
         )
 
@@ -331,7 +326,6 @@ class Discriminator(nn.Module):
             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
             output = self.main(input)
-#         print(input.size(), output.size())
 
         return output.view(-1, 1).squeeze(1)
 
