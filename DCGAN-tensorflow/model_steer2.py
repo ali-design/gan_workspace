@@ -153,7 +153,7 @@ class DCGAN(object):
 #     self.z_new_sum = histogram_summary("z_new", self.z_new)
     
     self.G_new                      = self.generator(self.z_new, self.y, reuse=True)
-#     self.sampler_new                = self.sampler(self.z_new, self.y)
+    self.sampler_new                = self.my_sampler(self.z_new, self.y)
     self.D_new_, self.D_logits_new_ = self.discriminator(self.G_new, self.y, reuse=True)
     ######
     
@@ -366,17 +366,17 @@ class DCGAN(object):
 
         if config.dataset == 'mnist':
             
-          alpha_vals = np.random.randint(-5, 6, size=[config.batch_size,1])  
-#           alpha_vals = np.zeros([config.batch_size,1])
-#           test_alpha, test_w = self.sess.run([self.alpha, self.w], feed_dict={self.alpha: alpha_vals})
-          out_zs = self.sampler.eval({ self.z: batch_z, self.y: batch_labels })
+#           alpha_vals = np.random.randint(-5, 6, size=[config.batch_size,1])  
+# #           alpha_vals = np.zeros([config.batch_size,1])
+# #           test_alpha, test_w = self.sess.run([self.alpha, self.w], feed_dict={self.alpha: alpha_vals})
+#           out_zs = self.sampler.eval({ self.z: batch_z, self.y: batch_labels })
 
-          target_fn, mask_fn = self.get_target_np(out_zs, alpha_vals)#, show_img=True, show_mask=True)
+#           target_fn, mask_fn = self.get_target_np(out_zs, alpha_vals)#, show_img=True, show_mask=True)
           
-#           G_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha: alpha_vals})
-#           G_new_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha:alpha_vals})
-#           print('sum of g and g_new diff', np.sum(G_new_np - G_np)**2)
-#           print(np.all(G_new_np==G_np))
+# #           G_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha: alpha_vals})
+# #           G_new_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha:alpha_vals})
+# #           print('sum of g and g_new diff', np.sum(G_new_np - G_np)**2)
+# #           print(np.all(G_new_np==G_np))
             
           # Update D network
           _, summary_str = self.sess.run([d_optim, self.d_sum],

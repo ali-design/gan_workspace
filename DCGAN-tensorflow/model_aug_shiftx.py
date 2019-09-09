@@ -158,6 +158,31 @@ class DCGAN(object):
     self.g_vars = [var for var in t_vars if 'g_' in var.name]
 
     self.saver = tf.train.Saver(max_to_keep=self.max_to_keep)
+  
+
+  def get_target_np(self, outputs_zs, alpha, show_img=False, show_mask=False):
+    target_fn = np.copy(outputs_zs)
+    mask_fn = np.ones(outputs_zs.shape)
+    
+    for i in range(outputs_zs.shape[0]):
+        if alpha[i,0] !=0:
+            M = np.float32([[1,0,alpha[i,0]],[0,1,0]])
+            target_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(outputs_zs[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
+            mask_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(mask_fn[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
+
+    mask_fn[np.nonzero(mask_fn)] = 1.
+    assert(np.setdiff1d(mask_fn, [0., 1.]).size == 0)
+        
+    if show_img:
+        print('Target image:')
+        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=11))
+
+    if show_mask:
+        print('Target mask:')
+        self.imshow(self.imgrid(np.uint8(mask_fn*255), cols=11))
+
+    return target_fn, mask_fn
+
 
   def train(self, config):
     d_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
@@ -485,13 +510,82 @@ class DCGAN(object):
 
         return tf.nn.sigmoid(deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
 
+    
+  def my_sampler(self, z, y=None):
+    with tf.variable_scope("generator") as scope:
+      scope.reuse_variables()
+
+      if not self.y_dim:
+        s_h, s_w = self.output_height, self.output_width
+        s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)
+        s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)
+        s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)
+        s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)
+
+        # project `z` and reshape
+        h0 = tf.reshape(
+            linear(z, self.gf_dim*8*s_h16*s_w16, 'g_h0_lin'),
+            [-1, s_h16, s_w16, self.gf_dim * 8])
+        h0 = tf.nn.relu(self.g_bn0(h0, train=False))
+
+        h1 = deconv2d(h0, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h1')
+        h1 = tf.nn.relu(self.g_bn1(h1, train=False))
+
+        h2 = deconv2d(h1, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h2')
+        h2 = tf.nn.relu(self.g_bn2(h2, train=False))
+
+        h3 = deconv2d(h2, [self.batch_size, s_h2, s_w2, self.gf_dim*1], name='g_h3')
+        h3 = tf.nn.relu(self.g_bn3(h3, train=False))
+
+        h4 = deconv2d(h3, [self.batch_size, s_h, s_w, self.c_dim], name='g_h4')
+
+        return tf.nn.tanh(h4)
+      else:
+        s_h, s_w = self.output_height, self.output_width
+        s_h2, s_h4 = int(s_h/2), int(s_h/4)
+        s_w2, s_w4 = int(s_w/2), int(s_w/4)
+
+        # yb = tf.reshape(y, [-1, 1, 1, self.y_dim])
+        yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
+        z = concat([z, y], 1)
+
+        h0 = tf.nn.relu(self.g_bn0(linear(z, self.gfc_dim, 'g_h0_lin'), train=False))
+        h0 = concat([h0, y], 1)
+
+        h1 = tf.nn.relu(self.g_bn1(
+            linear(h0, self.gf_dim*2*s_h4*s_w4, 'g_h1_lin'), train=False))
+        h1 = tf.reshape(h1, [self.batch_size, s_h4, s_w4, self.gf_dim * 2])
+        h1 = conv_cond_concat(h1, yb)
+
+        h2 = tf.nn.relu(self.g_bn2(
+            deconv2d(h1, [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2'), train=False))
+        h2 = conv_cond_concat(h2, yb)
+
+        return tf.nn.sigmoid(deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
+
   def load_mnist(self):
+    print('loading mnist...')
     data_dir = os.path.join(self.data_dir, self.dataset_name)
     
     fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
     trX = loaded[16:].reshape((60000,28,28,1)).astype(np.float)
 
+    # here shift train
+    idx = np.random.choice(60000, 50000, replace=False)
+    for i in range(len(idx)):
+        img_test_5px = np.zeros([28,28], dtype= 'float')
+        img_test = trX[idx[i],:,:,0]
+        offset_val = np.random.randint(1, 6)  
+        coin = np.random.uniform(0, 1)
+        if coin <= 0.5:
+            offset_val = -offset_val            
+        if(offset_val > 0):
+            img_test_5px[:,offset_val:] = img_test[:,:-offset_val]
+        else:
+            img_test_5px[:,:28+offset_val] = img_test[:,-offset_val:]
+        trX[idx[i],:,:,0] = img_test_5px
+    
     fd = open(os.path.join(data_dir,'train-labels-idx1-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
     trY = loaded[8:].reshape((60000)).astype(np.float)
@@ -503,7 +597,22 @@ class DCGAN(object):
     fd = open(os.path.join(data_dir,'t10k-labels-idx1-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
     teY = loaded[8:].reshape((10000)).astype(np.float)
-
+    
+    # here shfit test
+    idx = np.random.choice(10000, 9000, replace=False)
+    for i in range(len(idx)):
+        img_test_5px = np.zeros([28,28], dtype= 'float')
+        img_test = teX[idx[i],:,:,0]
+        offset_val = np.random.randint(0, 6)  
+        coin = np.random.uniform(0, 1)
+        if coin <= 0.5:
+            offset_val = -offset_val            
+        if(offset_val > 0):
+            img_test_5px[:,offset_val:] = img_test[:,:-offset_val]
+        else:
+            img_test_5px[:,:28+offset_val] = img_test[:,-offset_val:]
+        teX[idx[i],:,:,0] = img_test_5px
+    
     trY = np.asarray(trY)
     teY = np.asarray(teY)
     

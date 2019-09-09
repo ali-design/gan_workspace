@@ -288,7 +288,7 @@ class DCGAN(object):
     # in gan_steerability w_optim is "train_step", and we move definintion of loss to build_model fn, 
     # so instead of "loss", we call it walk_loss
 #     loss = tf.losses.compute_weighted_loss(tf.square(transformed_output-target), weights=mask)
-    lr = config.learning_rate
+    lr = config.learning_rate * 10
     w_optim = tf.train.AdamOptimizer(lr).minimize(self.walk_loss, var_list=tf.trainable_variables(scope='walk'), 
                                                  name='AdamOpter')
     try:
