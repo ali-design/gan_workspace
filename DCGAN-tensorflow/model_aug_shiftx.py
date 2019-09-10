@@ -39,6 +39,9 @@ class DCGAN(object):
       dfc_dim: (optional) Dimension of discrim units for fully connected layer. [1024]
       c_dim: (optional) Dimension of image color. For grayscale input, set to 1. [3]
     """
+    self.img_size = 28
+
+    
     self.sess = sess
     self.crop = crop
 
