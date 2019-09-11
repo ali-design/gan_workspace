@@ -149,7 +149,7 @@ class DCGAN(object):
     self.D_, self.D_logits_ = self.discriminator(self.G, self.y, reuse=True)
     
     ## This is new z    
-    self.z_new = self.z + self.alpha * self.w
+    self.z_new = self.z - tf.log(self.alpha) * self.w
 #     self.z_new_sum = histogram_summary("z_new", self.z_new)
     
     self.G_new                      = self.generator(self.z_new, self.y, reuse=True)
@@ -289,11 +289,11 @@ class DCGAN(object):
 
     if show_img:
         print('Target image:')
-        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=11))
+        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=8))
 
     if show_mask:
         print('Target mask:')
-        self.imshow(self.imgrid(np.uint8(mask_fn*255), cols=11))
+        self.imshow(self.imgrid(np.uint8(mask_out*255), cols=8))
 
     return target_fn, mask_out
 
@@ -384,12 +384,13 @@ class DCGAN(object):
 
         if config.dataset == 'mnist':
             
-#           alpha_vals = np.random.randint(-5, 6, size=[config.batch_size,1])  
-# #           alpha_vals = np.zeros([config.batch_size,1])
-# #           test_alpha, test_w = self.sess.run([self.alpha, self.w], feed_dict={self.alpha: alpha_vals})
-#           out_zs = self.sampler.eval({ self.z: batch_z, self.y: batch_labels })
+          alpha_vals = np.random.uniform(0.6, 1.67, size=[config.batch_size,1])
 
-#           target_fn, mask_fn = self.get_target_np(out_zs, alpha_vals)#, show_img=True, show_mask=True)
+#           alpha_vals = np.zeros([config.batch_size,1])
+#           test_alpha, test_w = self.sess.run([self.alpha, self.w], feed_dict={self.alpha: alpha_vals})
+          out_zs = self.sampler.eval({ self.z: batch_z, self.y: batch_labels })
+
+          target_fn, mask_fn = self.get_target_np(out_zs, alpha_vals, show_img=True, show_mask=True)
           
 # #           G_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha: alpha_vals})
 # #           G_new_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha:alpha_vals})
@@ -492,7 +493,7 @@ class DCGAN(object):
 
         if np.mod(counter, config.sample_freq) == 0:
           if config.dataset == 'mnist':
-            sample_alpha = np.random.randint(-5, 6, size=[config.batch_size,1])  
+            sample_alpha = np.random.uniform(0.6, 1.67, size=[config.batch_size,1])
 #             sample_alpha = np.zeros([config.batch_size,1])
             sample_out_zs = self.sampler.eval({ self.z: sample_z, self.y: sample_labels })
             sample_target_fn, sample_mask_fn = self.get_target_np(sample_out_zs, sample_alpha)#, show_img=True, show_mask=True)
@@ -745,11 +746,15 @@ class DCGAN(object):
 
     num_samples = 50000
     batch_size = 100
+    num_samples = 10
+    batch_size = 10
     idx = np.random.choice(60000, num_samples, replace=False)
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
         alphas = np.random.uniform(0.6, 1.67, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=trX[idx[s],:,:,:], alpha=alphas)
+        if (batch_start > 0):
+            print('aug next {} batch, {}% progress'.format((s.stop - s.start), batch_start/num_samples))
         trX[idx[s],:,:,:] = target_fn
 
     fd = open(os.path.join(data_dir,'train-labels-idx1-ubyte'))
@@ -762,11 +767,15 @@ class DCGAN(object):
 
     num_samples = 9000
     batch_size = 100
+#     num_samples = 10
+#     batch_size = 10
     idx = np.random.choice(10000, num_samples, replace=False)
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
         alphas = np.random.uniform(0.6, 1.67, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=teX[idx[s],:,:,:], alpha=alphas)
+        if (batch_start > 0):
+            print('aug next {} batch, {}% progress'.format((s.stop - s.start), batch_start/num_samples))
         teX[idx[s],:,:,:] = target_fn
         
     fd = open(os.path.join(data_dir,'t10k-labels-idx1-ubyte'))
