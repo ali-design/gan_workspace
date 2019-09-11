@@ -259,25 +259,56 @@ class DCGAN(object):
   def get_target_np(self, outputs_zs, alpha, show_img=False, show_mask=False):
     target_fn = np.copy(outputs_zs)
     mask_fn = np.ones(outputs_zs.shape)
-    
-    for i in range(outputs_zs.shape[0]):
-        if alpha[i,0] !=0:
-            M = np.float32([[1,0,alpha[i,0]],[0,1,0]])
-            target_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(outputs_zs[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
-            mask_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(mask_fn[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
+    mask_out = np.ones(outputs_zs.shape)
 
-    mask_fn[np.nonzero(mask_fn)] = 1.
-    assert(np.setdiff1d(mask_fn, [0., 1.]).size == 0)
+#     img_size = self.img_size
+    img_size = 28
+    
+    for b in range(outputs_zs.shape[0]):
+        print('alpha: ', alpha[b,0])
+        if alpha[b,0] !=1:
+            new_size = int(alpha[b,0]*img_size)
+    
+            ## crop            
+            if alpha[b,0] < 1:
+                print('alpha < 1 => crop')
+                output_cropped[b,:,:,:] = outputs_zs[b,img_size//2-new_size//2:img_size//2+new_size//2, img_size//2-new_size//2:img_size//2+new_size//2,:]
+                mask_cropped[b,:,:,:] = mask_fn[b,:,:,:]
+            ## padding
+            else:
+                print('alpha > 1 => pad')
+                output_cropped = np.zeros((1, new_size, new_size, outputs_zs.shape[3]))
+                mask_cropped = np.zeros((1, new_size, new_size, outputs_zs.shape[3]))
+                output_cropped[b, new_size//2-img_size//2:new_size//2+img_size//2, new_size//2-img_size//2:new_size//2+img_size//2,:] = outputs_zs 
+                mask_cropped[b, new_size//2-img_size//2:new_size//2+img_size//2, new_size//2-img_size//2:new_size//2+img_size//2,:] = mask_fn
+
+            ## Resize
+            target_fn[b,:,:,:] = np.zeros(1, outputs_zs.shape[1], outputs_zs.shape[2], outputs_zs.shape[3])
+            mask_out[b,:,:,:] = np.zeros(1, outputs_zs.shape[1], outputs_zs.shape[2], outputs_zs.shape[3])
+            for i in range(outputs_zs.shape[0]):
+                target_fn[i,:,:,:] = np.expand_dims(cv2.resize(output_cropped[i,:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR), axis=2)
+                mask_out[i,:,:,:] = np.expand_dims(cv2.resize(mask_cropped[i,:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR), axis=2)
+
+            mask_out[np.nonzero(mask_out)] = 1.
+            assert(np.setdiff1d(mask_out, [0., 1.]).size == 0)
+                
+#             M = np.float32([[1,0,alpha[i,0]],[0,1,0]])
+#             target_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(outputs_zs[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
+#             mask_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(mask_fn[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
+
+#     mask_fn[np.nonzero(mask_fn)] = 1.
+#     assert(np.setdiff1d(mask_fn, [0., 1.]).size == 0)
         
+#     print('target_fn.shape', target_fn.shape)
     if show_img:
         print('Target image:')
-        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=11))
+        self.imshow(self.imgrid(np.uint8(target_fn), cols=outputs_zs.shape[0]))
 
     if show_mask:
         print('Target mask:')
-        self.imshow(self.imgrid(np.uint8(mask_fn*255), cols=11))
+        self.imshow(self.imgrid(np.uint8(mask_out), cols=outputs_zs.shape[0]))
 
-    return target_fn, mask_fn
+    return target_fn, mask_out
 
   def train(self, config):
     d_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
