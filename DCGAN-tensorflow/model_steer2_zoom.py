@@ -88,8 +88,10 @@ class DCGAN(object):
 
     if self.dataset_name == 'mnist':
       if self.augment == True:
+        print('zoom aug is enabled')
         self.data_X, self.data_y = self.load_mnist_aug()
       else:
+        print('zoom aug is disabled')
         self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
     else:
@@ -742,6 +744,7 @@ class DCGAN(object):
 
   
   def load_mnist(self):
+    print('loading mnist without augmenting ...')
     data_dir = os.path.join(self.data_dir, self.dataset_name)
     
     fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
