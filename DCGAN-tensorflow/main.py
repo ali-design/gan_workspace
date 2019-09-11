@@ -19,6 +19,7 @@ flags.DEFINE_integer("input_width", None, "The size of image to use (will be cen
 flags.DEFINE_integer("output_height", 64, "The size of the output images to produce [64]")
 flags.DEFINE_integer("output_width", None, "The size of the output images to produce. If None, same value as output_height [None]")
 flags.DEFINE_string("dataset", "celebA", "The name of dataset [celebA, mnist, lsun]")
+flags.DEFINE_boolean("aug", False, "True for enabling transformation augmentation")
 flags.DEFINE_string("input_fname_pattern", "*.jpg", "Glob pattern of filename of input images [*]")
 flags.DEFINE_string("data_dir", "./data", "path to datasets [e.g. $HOME/data]")
 flags.DEFINE_string("out_dir", "./out", "Root directory for outputs [e.g. $HOME/out]")
@@ -88,6 +89,7 @@ def main(_):
           y_dim=10,
           z_dim=FLAGS.z_dim,
           dataset_name=FLAGS.dataset,
+          aug=FLAGS.aug,
           input_fname_pattern=FLAGS.input_fname_pattern,
           crop=FLAGS.crop,
           checkpoint_dir=FLAGS.checkpoint_dir,

@@ -28,7 +28,7 @@ class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=64,
-         gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
+         gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default', aug=False,
          max_to_keep=1,
          input_fname_pattern='*.jpg', checkpoint_dir='ckpts', sample_dir='samples', out_dir='./out', data_dir='./data'):
     """
@@ -78,6 +78,7 @@ class DCGAN(object):
     if not self.y_dim:
       self.g_bn3 = batch_norm(name='g_bn3')
 
+    self.augment = aug
     self.dataset_name = dataset_name
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
@@ -86,7 +87,10 @@ class DCGAN(object):
     self.max_to_keep = max_to_keep
 
     if self.dataset_name == 'mnist':
-      self.data_X, self.data_y = self.load_mnist()
+      if self.augment == True:
+        self.data_X, self.data_y = self.load_mnist_aug()
+      else:
+        self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
     else:
       data_path = os.path.join(self.data_dir, self.dataset_name, self.input_fname_pattern)
@@ -736,8 +740,47 @@ class DCGAN(object):
 
         return tf.nn.sigmoid(deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
 
+  
   def load_mnist(self):
-    print('loading mnist...')
+    data_dir = os.path.join(self.data_dir, self.dataset_name)
+    
+    fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    trX = loaded[16:].reshape((60000,28,28,1)).astype(np.float)
+
+    fd = open(os.path.join(data_dir,'train-labels-idx1-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    trY = loaded[8:].reshape((60000)).astype(np.float)
+
+    fd = open(os.path.join(data_dir,'t10k-images-idx3-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    teX = loaded[16:].reshape((10000,28,28,1)).astype(np.float)
+
+    fd = open(os.path.join(data_dir,'t10k-labels-idx1-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    teY = loaded[8:].reshape((10000)).astype(np.float)
+
+    trY = np.asarray(trY)
+    teY = np.asarray(teY)
+    
+    X = np.concatenate((trX, teX), axis=0)
+    y = np.concatenate((trY, teY), axis=0).astype(np.int)
+    
+    seed = 547
+    np.random.seed(seed)
+    np.random.shuffle(X)
+    np.random.seed(seed)
+    np.random.shuffle(y)
+    
+    y_vec = np.zeros((len(y), self.y_dim), dtype=np.float)
+    for i, label in enumerate(y):
+      y_vec[i,y[i]] = 1.0
+    
+    return X/255.,y_vec
+
+ 
+  def load_mnist_aug(self):
+    print('loading mnist and augmenting ...')
     data_dir = os.path.join('./data', 'mnist')
 
     fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
