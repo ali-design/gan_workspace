@@ -271,23 +271,26 @@ class DCGAN(object):
     
             ## crop            
             if alpha[b,0] < 1:
-                print('alpha < 1 => crop')
                 output_cropped = outputs_zs[b,img_size//2-new_size//2:img_size//2+new_size//2, img_size//2-new_size//2:img_size//2+new_size//2,:]
                 mask_cropped = mask_fn[b,:,:,:]
+                print('alpha < 1 => crop, shape output and mask cropped:', output_cropped.shape, mask_cropped.shape)
+
             ## padding
             else:
-                print('alpha > 1 => pad')
                 output_cropped = np.zeros((new_size, new_size, outputs_zs.shape[3]))
                 mask_cropped = np.zeros((new_size, new_size, outputs_zs.shape[3]))
                 output_cropped[new_size//2-img_size//2:new_size//2+img_size//2, new_size//2-img_size//2:new_size//2+img_size//2,:] = outputs_zs[b,:,:,:] 
                 mask_cropped[new_size//2-img_size//2:new_size//2+img_size//2, new_size//2-img_size//2:new_size//2+img_size//2,:] = mask_fn[b,:,:,:]
+                print('alpha > 1 => pad, shape output and mask cropped:', output_cropped.shape, mask_cropped.shape)
 
             ## Resize
             # target_fn[b,:,:,:] = np.zeros(1, outputs_zs.shape[1], outputs_zs.shape[2], outputs_zs.shape[3])
             # mask_out[b,:,:,:] = np.zeros(1, outputs_zs.shape[1], outputs_zs.shape[2], outputs_zs.shape[3])
-            
-            target_fn[b,:,:,:] = np.expand_dims(cv2.resize(output_cropped[b,:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR), axis=2)
-            mask_out[b,:,:,:] = np.expand_dims(cv2.resize(mask_cropped[b,:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR), axis=2)
+            t1 = cv2.resize(output_cropped[:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR)
+            t2 = np.expand_dims(t1, axis=2)
+            print('shape t1 and t2 and target_fn[b,:,:,:]:', t1.shape, t2.shape, target_fn[b,:,:,:])
+            target_fn[b,:,:,:] = np.expand_dims(cv2.resize(output_cropped[:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR), axis=2)
+            mask_out[b,:,:,:] = np.expand_dims(cv2.resize(mask_cropped[:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR), axis=2)
 
             mask_out[np.nonzero(mask_out)] = 1.
             assert(np.setdiff1d(mask_out, [0., 1.]).size == 0)
