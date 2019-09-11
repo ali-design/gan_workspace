@@ -289,11 +289,11 @@ class DCGAN(object):
 
     if show_img:
         print('Target image:')
-        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=11))
+        self.imshow(self.imgrid(imarray=np.uint8(target_fn*255), cols=11))
 
     if show_mask:
         print('Target mask:')
-        self.imshow(self.imgrid(np.uint8(mask_fn*255), cols=11))
+        self.imshow(self.imgrid(imarray=np.uint8(mask_fn*255), cols=11))
 
     return target_fn, mask_out
 
