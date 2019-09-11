@@ -288,7 +288,7 @@ class DCGAN(object):
             # mask_out[b,:,:,:] = np.zeros(1, outputs_zs.shape[1], outputs_zs.shape[2], outputs_zs.shape[3])
             t1 = cv2.resize(output_cropped[:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR)
             t2 = np.expand_dims(t1, axis=2)
-            print('shape t1 and t2 and target_fn[b,:,:,:]:', t1.shape, t2.shape, target_fn[b,:,:,:])
+            print('shape t1 and t2 and target_fn[b,:,:,:]:', t1.shape, t2.shape, target_fn[b,:,:,:].shape)
             target_fn[b,:,:,:] = np.expand_dims(cv2.resize(output_cropped[:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR), axis=2)
             mask_out[b,:,:,:] = np.expand_dims(cv2.resize(mask_cropped[:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR), axis=2)
 
