@@ -289,11 +289,11 @@ class DCGAN(object):
 
     if show_img:
         print('Target image:')
-        self.imshow(self.imgrid(imarray=np.uint8(target_fn*255), cols=11))
+        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=11))
 
     if show_mask:
         print('Target mask:')
-        self.imshow(self.imgrid(imarray=np.uint8(mask_fn*255), cols=11))
+        self.imshow(self.imgrid(np.uint8(mask_fn*255), cols=11))
 
     return target_fn, mask_out
 
@@ -737,27 +737,21 @@ class DCGAN(object):
 
   def load_mnist(self):
     print('loading mnist...')
-    data_dir = os.path.join(self.data_dir, self.dataset_name)
-    
+    data_dir = os.path.join('./data', 'mnist')
+
     fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
     trX = loaded[16:].reshape((60000,28,28,1)).astype(np.float)
 
-    # here shift train
-    idx = np.random.choice(60000, 50000, replace=False)
-    for i in range(len(idx)):
-        img_test_5px = np.zeros([28,28], dtype= 'float')
-        img_test = trX[idx[i],:,:,0]
-        offset_val = np.random.randint(1, 6)  
-        coin = np.random.uniform(0, 1)
-        if coin <= 0.5:
-            offset_val = -offset_val            
-        if(offset_val > 0):
-            img_test_5px[:,offset_val:] = img_test[:,:-offset_val]
-        else:
-            img_test_5px[:,:28+offset_val] = img_test[:,-offset_val:]
-        trX[idx[i],:,:,0] = img_test_5px
-    
+    num_samples = 50000
+    batch_size = 100
+    idx = np.random.choice(60000, num_samples, replace=False)
+    for batch_start in range(0, num_samples, batch_size):
+        s = slice(batch_start, min(num_samples, batch_start + batch_size))
+        alphas = np.random.uniform(0.6, 1.67, size=[(s.stop - s.start),1])
+        target_fn, _ = self.get_target_np(outputs_zs=trX[idx[s],:,:,:], alpha=alphas)
+        trX[idx[s],:,:,:] = target_fn
+
     fd = open(os.path.join(data_dir,'train-labels-idx1-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
     trY = loaded[8:].reshape((60000)).astype(np.float)
@@ -766,25 +760,19 @@ class DCGAN(object):
     loaded = np.fromfile(file=fd,dtype=np.uint8)
     teX = loaded[16:].reshape((10000,28,28,1)).astype(np.float)
 
+    num_samples = 9000
+    batch_size = 100
+    idx = np.random.choice(10000, num_samples, replace=False)
+    for batch_start in range(0, num_samples, batch_size):
+        s = slice(batch_start, min(num_samples, batch_start + batch_size))
+        alphas = np.random.uniform(0.6, 1.67, size=[(s.stop - s.start),1])
+        target_fn, _ = self.get_target_np(outputs_zs=teX[idx[s],:,:,:], alpha=alphas)
+        teX[idx[s],:,:,:] = target_fn
+        
     fd = open(os.path.join(data_dir,'t10k-labels-idx1-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
     teY = loaded[8:].reshape((10000)).astype(np.float)
-    
-    # here shfit test
-    idx = np.random.choice(10000, 9000, replace=False)
-    for i in range(len(idx)):
-        img_test_5px = np.zeros([28,28], dtype= 'float')
-        img_test = teX[idx[i],:,:,0]
-        offset_val = np.random.randint(0, 6)  
-        coin = np.random.uniform(0, 1)
-        if coin <= 0.5:
-            offset_val = -offset_val            
-        if(offset_val > 0):
-            img_test_5px[:,offset_val:] = img_test[:,:-offset_val]
-        else:
-            img_test_5px[:,:28+offset_val] = img_test[:,-offset_val:]
-        teX[idx[i],:,:,0] = img_test_5px
-    
+
     trY = np.asarray(trY)
     teY = np.asarray(teY)
     
