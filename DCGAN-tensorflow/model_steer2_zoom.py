@@ -390,7 +390,7 @@ class DCGAN(object):
 #           test_alpha, test_w = self.sess.run([self.alpha, self.w], feed_dict={self.alpha: alpha_vals})
           out_zs = self.sampler.eval({ self.z: batch_z, self.y: batch_labels })
 
-          target_fn, mask_fn = self.get_target_np(out_zs, alpha_vals, show_img=True, show_mask=True)
+          target_fn, mask_fn = self.get_target_np(out_zs, alpha_vals)#, show_img=True, show_mask=True)
           
 # #           G_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha: alpha_vals})
 # #           G_new_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha:alpha_vals})
