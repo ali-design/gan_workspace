@@ -746,8 +746,8 @@ class DCGAN(object):
 
     num_samples = 50000
     batch_size = 100
-    num_samples = 10
-    batch_size = 10
+#     num_samples = 10
+#     batch_size = 10
     idx = np.random.choice(60000, num_samples, replace=False)
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
