@@ -265,7 +265,6 @@ class DCGAN(object):
     img_size = 28
     
     for b in range(outputs_zs.shape[0]):
-        print('alpha: ', alpha[b,0])
         if alpha[b,0] !=1:
             new_size = int(alpha[b,0]*img_size)
     
@@ -273,7 +272,6 @@ class DCGAN(object):
             if alpha[b,0] < 1:
                 output_cropped = outputs_zs[b,img_size//2-new_size//2:img_size//2+new_size//2, img_size//2-new_size//2:img_size//2+new_size//2,:]
                 mask_cropped = mask_fn[b,:,:,:]
-                print('alpha < 1 => crop, shape output and mask cropped:', output_cropped.shape, mask_cropped.shape)
 
             ## padding
             else:
@@ -281,35 +279,21 @@ class DCGAN(object):
                 mask_cropped = np.zeros((new_size, new_size, outputs_zs.shape[3]))
                 output_cropped[new_size//2-img_size//2:new_size//2+img_size//2, new_size//2-img_size//2:new_size//2+img_size//2,:] = outputs_zs[b,:,:,:] 
                 mask_cropped[new_size//2-img_size//2:new_size//2+img_size//2, new_size//2-img_size//2:new_size//2+img_size//2,:] = mask_fn[b,:,:,:]
-                print('alpha > 1 => pad, shape output and mask cropped:', output_cropped.shape, mask_cropped.shape)
 
             ## Resize
-            # target_fn[b,:,:,:] = np.zeros(1, outputs_zs.shape[1], outputs_zs.shape[2], outputs_zs.shape[3])
-            # mask_out[b,:,:,:] = np.zeros(1, outputs_zs.shape[1], outputs_zs.shape[2], outputs_zs.shape[3])
-            t1 = cv2.resize(output_cropped[:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR)
-            t2 = np.expand_dims(t1, axis=2)
-            print('shape t1 and t2 and target_fn[b,:,:,:]:', t1.shape, t2.shape, target_fn[b,:,:,:].shape)
             target_fn[b,:,:,:] = np.expand_dims(cv2.resize(output_cropped[:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR), axis=2)
             mask_out[b,:,:,:] = np.expand_dims(cv2.resize(mask_cropped[:,:,:], (img_size, img_size), interpolation = cv2.INTER_LINEAR), axis=2)
 
             mask_out[np.nonzero(mask_out)] = 1.
             assert(np.setdiff1d(mask_out, [0., 1.]).size == 0)
-                
-#             M = np.float32([[1,0,alpha[i,0]],[0,1,0]])
-#             target_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(outputs_zs[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
-#             mask_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(mask_fn[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
 
-#     mask_fn[np.nonzero(mask_fn)] = 1.
-#     assert(np.setdiff1d(mask_fn, [0., 1.]).size == 0)
-        
-#     print('target_fn.shape', target_fn.shape)
     if show_img:
         print('Target image:')
-        self.imshow(self.imgrid(np.uint8(target_fn), cols=outputs_zs.shape[0]))
+        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=11))
 
     if show_mask:
         print('Target mask:')
-        self.imshow(self.imgrid(np.uint8(mask_out), cols=outputs_zs.shape[0]))
+        self.imshow(self.imgrid(np.uint8(mask_fn*255), cols=11))
 
     return target_fn, mask_out
 
