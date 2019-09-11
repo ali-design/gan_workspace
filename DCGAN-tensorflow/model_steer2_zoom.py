@@ -753,8 +753,8 @@ class DCGAN(object):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
         alphas = np.random.uniform(0.6, 1.67, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=trX[idx[s],:,:,:], alpha=alphas)
-        if (batch_start > 0):
-            print('aug next {} batch, {}% progress'.format((s.stop - s.start), batch_start/num_samples))
+        if (batch_start > 0) and (batch_start % 10000 == 0):
+            print('Zoom train aug {}% progress'.format(100*batch_start/num_samples))
         trX[idx[s],:,:,:] = target_fn
 
     fd = open(os.path.join(data_dir,'train-labels-idx1-ubyte'))
@@ -774,8 +774,8 @@ class DCGAN(object):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
         alphas = np.random.uniform(0.6, 1.67, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=teX[idx[s],:,:,:], alpha=alphas)
-        if (batch_start > 0):
-            print('aug next {} batch, {}% progress'.format((s.stop - s.start), batch_start/num_samples))
+        if (batch_start > 0) and (batch_start % 3000 == 0):
+            print('Zoom test aug {}% progress'.format(100*batch_start/num_samples))
         teX[idx[s],:,:,:] = target_fn
         
     fd = open(os.path.join(data_dir,'t10k-labels-idx1-ubyte'))
