@@ -3,12 +3,12 @@ import scipy.misc
 import numpy as np
 import json
 
-from model_steer2_zoom import DCGAN
 from utils import pp, visualize, to_json, show_all_variables, expand_path, timestamp
 
 import tensorflow as tf
 
 flags = tf.app.flags
+flags.DEFINE_boolean("steer", False, "True for traning argminGW, False for training vanilla G")
 flags.DEFINE_integer("epoch", 25, "Epoch to train [25]")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
@@ -43,6 +43,14 @@ FLAGS = flags.FLAGS
 def main(_):
   pp.pprint(flags.FLAGS.__flags)
   
+  if FLAGS.steer:
+    print('Training with steerable G -> loading model_argminGW2_zoom ...')
+    from model_argminGW2_zoom import DCGAN
+  else:
+    print('Training vanilla G -> loading model_vanilla_zoom ...')
+    from model_vanilla_zoom import DCGAN
+
+    
   # expand user name and environment variables
   FLAGS.data_dir = expand_path(FLAGS.data_dir)
   FLAGS.out_dir = expand_path(FLAGS.out_dir)
