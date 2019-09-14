@@ -307,6 +307,9 @@ class DCGAN(object):
       print(" [!] Load failed...")
 
     for epoch in xrange(config.epoch):
+      if self.augment == True:
+        print('zoom aug is enabled')
+        self.data_X, self.data_y = self.load_mnist_aug()
       if config.dataset == 'mnist':
         batch_idxs = min(len(self.data_X), config.train_size) // config.batch_size
       else:      
