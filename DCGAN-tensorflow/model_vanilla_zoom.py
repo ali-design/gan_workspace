@@ -363,14 +363,14 @@ class DCGAN(object):
             feed_dict={ self.z: batch_z, self.y:batch_labels })
           self.writer.add_summary(summary_str, counter)
         
-          G = self.sampler.eval({self.z: batch_z, self.y: batch_labels})
-          h0, w, bias, out, input_ = self.sess.run([self.h0, self.w, self.bias, self.out, self.input_], feed_dict={ self.z: batch_z, self.y:batch_labels })
-          h0_new, w_new, bias_new, out_new, input_new = self.sess.run([self.h0, self.w, self.bias, self.out, self.input_], feed_dict={ self.z: batch_z, self.y:batch_labels })
-#           print(input_shape)
-          print('assert',np.all(h0[0]==h0_new[0]), np.all(w==w_new), np.all(bias==bias_new), np.all(out==out_new), np.all(input_==input_new))
-#           for vars in  [n.name for n in tf.trainable_variables()]:
-#             if 'g_h2' in vars:
-#               print(vars)
+#           G = self.sampler.eval({self.z: batch_z, self.y: batch_labels})
+#           h0, w, bias, out, input_ = self.sess.run([self.h0, self.w, self.bias, self.out, self.input_], feed_dict={ self.z: batch_z, self.y:batch_labels })
+#           h0_new, w_new, bias_new, out_new, input_new = self.sess.run([self.h0, self.w, self.bias, self.out, self.input_], feed_dict={ self.z: batch_z, self.y:batch_labels })
+# #           print(input_shape)
+#           print('assert',np.all(h0[0]==h0_new[0]), np.all(w==w_new), np.all(bias==bias_new), np.all(out==out_new), np.all(input_==input_new))
+# #           for vars in  [n.name for n in tf.trainable_variables()]:
+# #             if 'g_h2' in vars:
+# #               print(vars)
           
           errD_fake = self.d_loss_fake.eval({
               self.z: batch_z, 
