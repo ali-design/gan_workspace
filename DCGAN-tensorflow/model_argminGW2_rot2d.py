@@ -54,6 +54,7 @@ class DCGAN(object):
     self.input_width = input_width
     self.output_height = output_height
     self.output_width = output_width
+    self.img_size = 28
 
     self.y_dim = y_dim
     self.z_dim = z_dim
@@ -88,10 +89,10 @@ class DCGAN(object):
 
     if self.dataset_name == 'mnist':
       if self.augment == True:
-        print('zoom aug is enabled')
+        print('rot2d aug is enabled')
         self.data_X, self.data_y = self.load_mnist_aug()
       else:
-        print('zoom aug is disabled')
+        print('rot2d aug is disabled')
         self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
     else:
@@ -115,7 +116,6 @@ class DCGAN(object):
 
   def build_model(self):
     # Lets first define our placeholders and vars:
-    self.img_size = 28
     self.Nsliders = 1
     img_size = self.img_size
     Nsliders = self.Nsliders
@@ -263,29 +263,32 @@ class DCGAN(object):
     return disp
 
   def get_target_np(self, outputs_zs, alpha, show_img=False, show_mask=False):
-    self.img_size = 28
     target_fn = np.copy(outputs_zs)
     mask_fn = np.ones(outputs_zs.shape)
-#     print('rotate with alphas:', alpha)
-    
+    print('rotate with alphas:', alpha)
+    mask_out = np.zeros(outputs_zs.shape)
+
     for i in range(outputs_zs.shape[0]):
         if alpha[i,0] !=0:
             M = cv2.getRotationMatrix2D((self.img_size//2, self.img_size//2), alpha[i,0], 1)
             target_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(outputs_zs[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
             mask_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(mask_fn[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
-
-    mask_fn[np.nonzero(mask_fn)] = 1.
-    assert(np.setdiff1d(mask_fn, [0., 1.]).size == 0)
+            mask_out[i,:,:,:] = np.expand_dims(cv2.warpAffine(mask_fn[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
+        else:
+            mask_out[i,:,:,:] = mask_fn[i,:,:,:]
+            
+    mask_out[np.nonzero(mask_out)] = 1.
+    assert(np.setdiff1d(mask_out, [0., 1.]).size == 0)
         
     if show_img:
         print('Target image:')
-        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=11))
+        self.imshow(self.imgrid(np.uint8(target_fn), cols=4))
 
     if show_mask:
         print('Target mask:')
-        self.imshow(self.imgrid(np.uint8(mask_fn*255), cols=11))
+        self.imshow(self.imgrid(np.uint8(mask_out*255), cols=4))
 
-    return target_fn, mask_fn
+    return target_fn, mask_out
 
 
   def train(self, config):
@@ -378,7 +381,7 @@ class DCGAN(object):
 
         if config.dataset == 'mnist':
             
-          alpha_vals = np.random.randint(-20, 21, size=[config.batch_size,1])  
+          alpha_vals = np.random.randint(-10, 11, size=[config.batch_size,1])  
 
 #           alpha_vals = np.zeros([config.batch_size,1])
 #           test_alpha, test_w = self.sess.run([self.alpha, self.w], feed_dict={self.alpha: alpha_vals})
@@ -487,7 +490,7 @@ class DCGAN(object):
 
         if np.mod(counter, config.sample_freq) == 0:
           if config.dataset == 'mnist':
-            sample_alpha = np.random.randint(-20, 21, size=[config.batch_size,1])  
+            sample_alpha = np.random.randint(-10, 11, size=[config.batch_size,1])  
 #             sample_alpha = np.zeros([config.batch_size,1])
             sample_out_zs = self.sampler.eval({ self.z: sample_z, self.y: sample_labels })
             sample_target_fn, sample_mask_fn = self.get_target_np(sample_out_zs, sample_alpha)#, show_img=True, show_mask=True)
@@ -786,7 +789,7 @@ class DCGAN(object):
     print('first 10 idx....', idx[0:10])
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
-        alphas = np.random.randint(-20, 21, size=[(s.stop - s.start),1])
+        alphas = np.random.randint(-10, 11, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=trX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 10000 == 0):
             print('Zoom train aug {}% progress'.format(100*batch_start/num_samples))
@@ -807,7 +810,7 @@ class DCGAN(object):
     idx = np.random.choice(10000, num_samples, replace=False)
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
-        alphas = np.random.randint(-20, 21, size=[(s.stop - s.start),1])
+        alphas = np.random.randint(-10, 11, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=teX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 3000 == 0):
             print('Zoom test aug {}% progress'.format(100*batch_start/num_samples))
