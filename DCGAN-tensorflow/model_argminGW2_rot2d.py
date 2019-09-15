@@ -155,7 +155,7 @@ class DCGAN(object):
     self.D_, self.D_logits_ = self.discriminator(self.G, self.y, reuse=True)
     
     ## This is new z    
-    self.z_new = self.z - tf.log(self.alpha) * self.w
+    self.z_new = self.z + self.alpha * self.w
 #     self.z_new_sum = histogram_summary("z_new", self.z_new)
     
     self.G_new                      = self.generator(self.z_new, self.y, reuse=True)
@@ -388,7 +388,7 @@ class DCGAN(object):
           out_zs = self.sampler.eval({ self.z: batch_z, self.y: batch_labels })
 
           target_fn, mask_fn = self.get_target_np(out_zs, alpha_vals)#, show_img=True, show_mask=True)
-          
+          alpha_vals = alpha_vals/10
 # #           G_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha: alpha_vals})
 # #           G_new_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha:alpha_vals})
 # #           print('sum of g and g_new diff', np.sum(G_new_np - G_np)**2)
@@ -494,7 +494,7 @@ class DCGAN(object):
 #             sample_alpha = np.zeros([config.batch_size,1])
             sample_out_zs = self.sampler.eval({ self.z: sample_z, self.y: sample_labels })
             sample_target_fn, sample_mask_fn = self.get_target_np(sample_out_zs, sample_alpha)#, show_img=True, show_mask=True)
-            
+            sample_alpha = sample_alpha/10
             samples, d_loss, g_loss, walk_loss = self.sess.run(
               [self.sampler, self.d_loss, self.g_loss, self.walk_loss],
               feed_dict={
