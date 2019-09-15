@@ -265,7 +265,7 @@ class DCGAN(object):
   def get_target_np(self, outputs_zs, alpha, show_img=False, show_mask=False):
     target_fn = np.copy(outputs_zs)
     mask_fn = np.ones(outputs_zs.shape)
-    print('rotate with alphas:', alpha)
+#     print('rotate with alphas:', alpha)
     mask_out = np.zeros(outputs_zs.shape)
 
     for i in range(outputs_zs.shape[0]):
