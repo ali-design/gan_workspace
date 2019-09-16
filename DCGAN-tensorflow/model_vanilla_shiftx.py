@@ -11,10 +11,6 @@ from six.moves import xrange
 from ops import *
 from utils import *
 
-import io
-import IPython.display
-import PIL.Image
-
 def conv_out_size_same(size, stride):
   return int(math.ceil(float(size) / float(stride)))
 
@@ -32,7 +28,6 @@ class DCGAN(object):
          max_to_keep=1,
          input_fname_pattern='*.jpg', checkpoint_dir='ckpts', sample_dir='samples', out_dir='./out', data_dir='./data'):
     """
-
     Args:
       sess: TensorFlow session
       batch_size: The size of batch. Should be specified before training.
@@ -43,7 +38,7 @@ class DCGAN(object):
       gfc_dim: (optional) Dimension of gen units for for fully connected layer. [1024]
       dfc_dim: (optional) Dimension of discrim units for fully connected layer. [1024]
       c_dim: (optional) Dimension of image color. For grayscale input, set to 1. [3]
-    """    
+    """
     self.sess = sess
     self.crop = crop
 
@@ -115,23 +110,8 @@ class DCGAN(object):
     self.build_model()
 
   def build_model(self):
-    # Lets first define our placeholders and vars:
-    self.Nsliders = 1
-    img_size = self.img_size
-    Nsliders = self.Nsliders
-    
-    ## Placeholder for new z
-    self.target = tf.placeholder(tf.float32, shape=(None, img_size, img_size, Nsliders))
-    self.mask = tf.placeholder(tf.float32, shape=(None, img_size, img_size, Nsliders))
-    self.alpha = tf.placeholder(tf.float32, shape=(None, self.Nsliders))
-    self.w = tf.Variable(np.random.uniform(-1, 1, [1, self.z_dim]), name='walk', dtype=np.float32)
-    ######
-    
-    # The rest is the original code:
     if self.y_dim:
-#       self.y = tf.placeholder(tf.float32, [self.batch_size, self.y_dim], name='y')
-      self.y = tf.placeholder(tf.float32, shape=(None, self.y_dim), name='y')
-
+      self.y = tf.placeholder(tf.float32, [self.batch_size, self.y_dim], name='y')
     else:
       self.y = None
 
@@ -148,28 +128,15 @@ class DCGAN(object):
     self.z = tf.placeholder(
       tf.float32, [None, self.z_dim], name='z')
     self.z_sum = histogram_summary("z", self.z)
-    
-    self.G                  = self.generator(self.z, self.y, reuse=False)
+
+    self.G, self.h0, self.w, self.bias, self.out, self.input_         = self.generator(self.z, self.y)
     self.D, self.D_logits   = self.discriminator(inputs, self.y, reuse=False)
     self.sampler            = self.sampler(self.z, self.y)
     self.D_, self.D_logits_ = self.discriminator(self.G, self.y, reuse=True)
     
-    ## This is new z    
-    self.z_new = self.z + self.alpha * self.w
-#     self.z_new_sum = histogram_summary("z_new", self.z_new)
-    
-    self.G_new                      = self.generator(self.z_new, self.y, reuse=True)
-    self.sampler_new                = self.my_sampler(self.z_new, self.y)
-    self.D_new_, self.D_logits_new_ = self.discriminator(self.G_new, self.y, reuse=True)
-    ######
-    
     self.d_sum = histogram_summary("d", self.D)
     self.d__sum = histogram_summary("d_", self.D_)
     self.G_sum = image_summary("G", self.G)
-    
-    ## This is for new z
-#     self.d_new_sum = histogram_summary("d_new", self.D_new_)
-#     self.G_new_sum = histogram_summary("G_new", self.G_new)
 
     def sigmoid_cross_entropy_with_logits(x, y):
       try:
@@ -183,24 +150,11 @@ class DCGAN(object):
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
     self.g_loss = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_)))
-    
-    ## This is for new z
-    self.d_loss_fake_new = tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits_new_, tf.zeros_like(self.D_new_)))
-    self.g_loss_new =tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits_new_, tf.ones_like(self.D_new_)))
-    self.walk_loss = self.g_loss + self.g_loss_new + tf.losses.compute_weighted_loss(tf.square(self.G_new - self.target), weights=self.mask)
-    ######
 
     self.d_loss_real_sum = scalar_summary("d_loss_real", self.d_loss_real)
     self.d_loss_fake_sum = scalar_summary("d_loss_fake", self.d_loss_fake)
                           
-#     self.d_loss = self.d_loss_real + self.d_loss_fake
-    ## This is for new z
-    self.d_loss = self.d_loss_real + self.d_loss_fake + self.d_loss_fake_new
-#     self.g_loss = self.g_loss + self.g_loss_new
-    self.g_loss = self.walk_loss
-    ######
+    self.d_loss = self.d_loss_real + self.d_loss_fake
 
     self.g_loss_sum = scalar_summary("g_loss", self.g_loss)
     self.d_loss_sum = scalar_summary("d_loss", self.d_loss)
@@ -209,8 +163,9 @@ class DCGAN(object):
 
     self.d_vars = [var for var in t_vars if 'd_' in var.name]
     self.g_vars = [var for var in t_vars if 'g_' in var.name]
-    
+
     self.saver = tf.train.Saver(max_to_keep=self.max_to_keep)
+
 
   def imgrid(self, imarray, cols=5, pad=1):
     if imarray.dtype != np.uint8:
@@ -265,30 +220,25 @@ class DCGAN(object):
   def get_target_np(self, outputs_zs, alpha, show_img=False, show_mask=False):
     target_fn = np.copy(outputs_zs)
     mask_fn = np.ones(outputs_zs.shape)
-#     print('rotate with alphas:', alpha)
-    mask_out = np.zeros(outputs_zs.shape)
-
+    
     for i in range(outputs_zs.shape[0]):
         if alpha[i,0] !=0:
-            M = cv2.getRotationMatrix2D((self.img_size//2, self.img_size//2), alpha[i,0], 1)
+            M = np.float32([[1,0,alpha[i,0]],[0,1,0]])
             target_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(outputs_zs[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
             mask_fn[i,:,:,:] = np.expand_dims(cv2.warpAffine(mask_fn[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
-            mask_out[i,:,:,:] = np.expand_dims(cv2.warpAffine(mask_fn[i,:,:,:], M, (self.img_size, self.img_size)), axis=2)
-        else:
-            mask_out[i,:,:,:] = mask_fn[i,:,:,:]
-            
-    mask_out[np.nonzero(mask_out)] = 1.
-    assert(np.setdiff1d(mask_out, [0., 1.]).size == 0)
+
+    mask_fn[np.nonzero(mask_fn)] = 1.
+    assert(np.setdiff1d(mask_fn, [0., 1.]).size == 0)
         
     if show_img:
         print('Target image:')
-        self.imshow(self.imgrid(np.uint8(target_fn), cols=4))
+        self.imshow(self.imgrid(np.uint8(target_fn), cols=11))
 
     if show_mask:
         print('Target mask:')
-        self.imshow(self.imgrid(np.uint8(mask_out*255), cols=4))
+        self.imshow(self.imgrid(np.uint8(mask_fn*255), cols=11))
 
-    return target_fn, mask_out
+    return target_fn, mask_fn
 
 
   def train(self, config):
@@ -296,13 +246,6 @@ class DCGAN(object):
               .minimize(self.d_loss, var_list=self.d_vars)
     g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
               .minimize(self.g_loss, var_list=self.g_vars)
-    # define optimal walk loss:
-    # in gan_steerability w_optim is "train_step", and we move definintion of loss to build_model fn, 
-    # so instead of "loss", we call it walk_loss
-#     loss = tf.losses.compute_weighted_loss(tf.square(transformed_output-target), weights=mask)
-    lr = config.learning_rate * 1
-    w_optim = tf.train.AdamOptimizer(lr).minimize(self.walk_loss, var_list=tf.trainable_variables(scope='walk'), 
-                                                 name='AdamOpter')
     try:
       tf.global_variables_initializer().run()
     except:
@@ -347,7 +290,7 @@ class DCGAN(object):
 
     for epoch in xrange(config.epoch):
       if self.augment == True:
-        print('rot2d aug is enabled')
+        print('zoom aug is enabled')
         self.data_X, self.data_y = self.load_mnist_aug()
       if config.dataset == 'mnist':
         batch_idxs = min(len(self.data_X), config.train_size) // config.batch_size
@@ -380,89 +323,48 @@ class DCGAN(object):
               .astype(np.float32)
 
         if config.dataset == 'mnist':
-            
-          alpha_vals = np.random.randint(-20, 21, size=[config.batch_size,1])  
-
-#           alpha_vals = np.zeros([config.batch_size,1])
-#           test_alpha, test_w = self.sess.run([self.alpha, self.w], feed_dict={self.alpha: alpha_vals})
-          out_zs = self.sampler.eval({ self.z: batch_z, self.y: batch_labels })
-
-          target_fn, mask_fn = self.get_target_np(out_zs, alpha_vals)#, show_img=True, show_mask=True)
-          alpha_vals = alpha_vals
-# #           G_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha: alpha_vals})
-# #           G_new_np = self.G_new.eval({self.z: batch_z, self.y:batch_labels, self.alpha:alpha_vals})
-# #           print('sum of g and g_new diff', np.sum(G_new_np - G_np)**2)
-# #           print(np.all(G_new_np==G_np))
-            
           # Update D network
           _, summary_str = self.sess.run([d_optim, self.d_sum],
             feed_dict={ 
               self.inputs: batch_images,
               self.z: batch_z,
               self.y:batch_labels,
-              self.target:target_fn,
-              self.mask:mask_fn,
-              self.alpha:alpha_vals
             })
           self.writer.add_summary(summary_str, counter)
 
           # Update G network
-          summary_w_optim = self.sess.run(w_optim,
-            feed_dict={
-              self.z: batch_z, 
-              self.y:batch_labels,
-              self.target:target_fn,
-              self.mask:mask_fn,
-              self.alpha:alpha_vals                
-            })
           _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={
               self.z: batch_z, 
               self.y:batch_labels,
-              self.target:target_fn,
-              self.mask:mask_fn,
-              self.alpha:alpha_vals                
             })
           self.writer.add_summary(summary_str, counter)
 
           # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-          summary_w_optim = self.sess.run(w_optim,
-            feed_dict={ self.z: batch_z, self.y:batch_labels, self.target:target_fn,
-                        self.mask:mask_fn,
-                        self.alpha:alpha_vals})              
-          _, summary_str, summary_w_optim = self.sess.run([g_optim, self.g_sum, w_optim],
-            feed_dict={ self.z: batch_z, self.y:batch_labels, self.target:target_fn,
-                        self.mask:mask_fn,
-                        self.alpha:alpha_vals})
+          _, summary_str = self.sess.run([g_optim, self.g_sum],
+            feed_dict={ self.z: batch_z, self.y:batch_labels })
           self.writer.add_summary(summary_str, counter)
+        
+#           G = self.sampler.eval({self.z: batch_z, self.y: batch_labels})
+#           h0, w, bias, out, input_ = self.sess.run([self.h0, self.w, self.bias, self.out, self.input_], feed_dict={ self.z: batch_z, self.y:batch_labels })
+#           h0_new, w_new, bias_new, out_new, input_new = self.sess.run([self.h0, self.w, self.bias, self.out, self.input_], feed_dict={ self.z: batch_z, self.y:batch_labels })
+# #           print(input_shape)
+#           print('assert',np.all(h0[0]==h0_new[0]), np.all(w==w_new), np.all(bias==bias_new), np.all(out==out_new), np.all(input_==input_new))
+# #           for vars in  [n.name for n in tf.trainable_variables()]:
+# #             if 'g_h2' in vars:
+# #               print(vars)
           
           errD_fake = self.d_loss_fake.eval({
               self.z: batch_z, 
-              self.y:batch_labels,
-              self.target:target_fn,
-              self.mask:mask_fn,
-              self.alpha:alpha_vals              
+              self.y:batch_labels
           })
           errD_real = self.d_loss_real.eval({
               self.inputs: batch_images,
-              self.y:batch_labels,
-              self.target:target_fn,
-              self.mask:mask_fn,
-              self.alpha:alpha_vals              
-          })
-          errWalk = self.walk_loss.eval({
-              self.z: batch_z,
-              self.y: batch_labels,
-              self.target:target_fn,
-              self.mask:mask_fn,
-              self.alpha:alpha_vals
+              self.y:batch_labels
           })
           errG = self.g_loss.eval({
               self.z: batch_z,
-              self.y: batch_labels,
-              self.target:target_fn,
-              self.mask:mask_fn,
-              self.alpha:alpha_vals
+              self.y: batch_labels
           })
         else:
           # Update D network
@@ -471,12 +373,12 @@ class DCGAN(object):
           self.writer.add_summary(summary_str, counter)
 
           # Update G network
-          _, summary_str, summary_w_optim = self.sess.run([g_optim, self.g_sum, w_optim],
+          _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={ self.z: batch_z })
           self.writer.add_summary(summary_str, counter)
 
           # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-          _, summary_str, summary_w_optim = self.sess.run([g_optim, self.g_sum, w_optim],
+          _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={ self.z: batch_z })
           self.writer.add_summary(summary_str, counter)
           
@@ -484,32 +386,23 @@ class DCGAN(object):
           errD_real = self.d_loss_real.eval({ self.inputs: batch_images })
           errG = self.g_loss.eval({self.z: batch_z})
 
-        print("[%8d Epoch:[%2d/%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f, walk_loss: %.8f" \
+        print("[%8d Epoch:[%2d/%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
           % (counter, epoch, config.epoch, idx, batch_idxs,
-            time.time() - start_time, errD_fake+errD_real, errG, errWalk))
+            time.time() - start_time, errD_fake+errD_real, errG))
 
         if np.mod(counter, config.sample_freq) == 0:
           if config.dataset == 'mnist':
-            sample_alpha = np.random.randint(-20, 21, size=[config.batch_size,1])  
-#             sample_alpha = np.zeros([config.batch_size,1])
-            sample_out_zs = self.sampler.eval({ self.z: sample_z, self.y: sample_labels })
-            sample_target_fn, sample_mask_fn = self.get_target_np(sample_out_zs, sample_alpha)#, show_img=True, show_mask=True)
-            sample_alpha = sample_alpha
-            samples, d_loss, g_loss, walk_loss = self.sess.run(
-              [self.sampler, self.d_loss, self.g_loss, self.walk_loss],
+            samples, d_loss, g_loss = self.sess.run(
+              [self.sampler, self.d_loss, self.g_loss],
               feed_dict={
                   self.z: sample_z,
                   self.inputs: sample_inputs,
                   self.y:sample_labels,
-                  self.target: sample_target_fn,
-                  self.mask: sample_mask_fn,
-                  self.alpha: sample_alpha
               }
             )
             save_images(samples, image_manifold_size(samples.shape[0]),
                   './{}/train_{:08d}.png'.format(config.sample_dir, counter))
-#             print("[Sample] d_loss: %.8f, g_loss: %.8f, w_loss: %.8f" % (d_loss, g_loss, walk_loss)) 
-            print("[Sample] d_loss: {}, g_loss: {}, w_loss: {}".format(d_loss, g_loss, walk_loss))
+            print("[Sample] d_loss: %.8f, g_loss: %.8f" % (d_loss, g_loss)) 
           else:
             try:
               samples, d_loss, g_loss = self.sess.run(
@@ -561,11 +454,8 @@ class DCGAN(object):
         
         return tf.nn.sigmoid(h3), h3
 
-  def generator(self, z, y=None, reuse=False):
+  def generator(self, z, y=None):
     with tf.variable_scope("generator") as scope:
-      if reuse:
-        scope.reuse_variables()
-        
       if not self.y_dim:
         s_h, s_w = self.output_height, self.output_width
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)
@@ -573,12 +463,6 @@ class DCGAN(object):
         s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)
         s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)
 
-        ## z and z_new here:
-        print('In G, z.shape: ', z.shape)
-        z_new = z + alpha * self.w
-        print('In G, z_new.shape', z_new.shape)
-        
-        
         # project `z` and reshape
         self.z_, self.h0_w, self.h0_b = linear(
             z, self.gf_dim*8*s_h16*s_w16, 'g_h0_lin', with_w=True)
@@ -611,7 +495,7 @@ class DCGAN(object):
         # yb = tf.expand_dims(tf.expand_dims(y, 1),2)
         yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
         z = concat([z, y], 1)
-        
+
         h0 = tf.nn.relu(
             self.g_bn0(linear(z, self.gfc_dim, 'g_h0_lin')))
         h0 = concat([h0, y], 1)
@@ -621,13 +505,18 @@ class DCGAN(object):
         h1 = tf.reshape(h1, [self.batch_size, s_h4, s_w4, self.gf_dim * 2])
 
         h1 = conv_cond_concat(h1, yb)
+        
+        out, w, bias, input_ = deconv2d(h1,
+            [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2', with_w=True)
 
-        h2 = tf.nn.relu(self.g_bn2(deconv2d(h1,
-            [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2')))
+#         h2 = tf.nn.relu(self.g_bn2(deconv2d(h1,
+#             [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2')))
+
+        h2 = tf.nn.relu(self.g_bn2(out))
         h2 = conv_cond_concat(h2, yb)
 
         return tf.nn.sigmoid(
-            deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
+            deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3')), h1, w, bias, out, input_
 
   def sampler(self, z, y=None):
     with tf.variable_scope("generator") as scope:
@@ -681,6 +570,7 @@ class DCGAN(object):
 
         return tf.nn.sigmoid(deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
 
+
   def my_sampler(self, z, y=None):
     with tf.variable_scope("generator") as scope:
       scope.reuse_variables()
@@ -733,7 +623,7 @@ class DCGAN(object):
 
         return tf.nn.sigmoid(deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
 
-  
+
   def load_mnist(self):
     print('loading mnist without augmenting ...')
     data_dir = os.path.join(self.data_dir, self.dataset_name)
@@ -789,7 +679,7 @@ class DCGAN(object):
     print('first 10 idx....', idx[0:10])
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
-        alphas = np.random.randint(-20, 21, size=[(s.stop - s.start),1])
+        alphas = np.random.randint(-5, 6, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=trX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 10000 == 0):
             print('Zoom train aug {}% progress'.format(100*batch_start/num_samples))
@@ -810,7 +700,7 @@ class DCGAN(object):
     idx = np.random.choice(10000, num_samples, replace=False)
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
-        alphas = np.random.randint(-20, 21, size=[(s.stop - s.start),1])
+        alphas = np.random.randint(-5, 6, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=teX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 3000 == 0):
             print('Zoom test aug {}% progress'.format(100*batch_start/num_samples))
@@ -837,6 +727,7 @@ class DCGAN(object):
       y_vec[i,y[i]] = 1.0
     
     return X/255.,y_vec
+
 
   @property
   def model_dir(self):

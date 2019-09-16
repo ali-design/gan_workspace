@@ -28,7 +28,7 @@ class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=64,
-         gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
+         gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default', aug=False,
          max_to_keep=1,
          input_fname_pattern='*.jpg', checkpoint_dir='ckpts', sample_dir='samples', out_dir='./out', data_dir='./data'):
     """
@@ -54,6 +54,7 @@ class DCGAN(object):
     self.input_width = input_width
     self.output_height = output_height
     self.output_width = output_width
+    self.img_size = 28
 
     self.y_dim = y_dim
     self.z_dim = z_dim
@@ -78,6 +79,7 @@ class DCGAN(object):
     if not self.y_dim:
       self.g_bn3 = batch_norm(name='g_bn3')
 
+    self.augment = aug
     self.dataset_name = dataset_name
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
@@ -86,7 +88,12 @@ class DCGAN(object):
     self.max_to_keep = max_to_keep
 
     if self.dataset_name == 'mnist':
-      self.data_X, self.data_y = self.load_mnist()
+      if self.augment == True:
+        print('shiftx aug is enabled')
+        self.data_X, self.data_y = self.load_mnist_aug()
+      else:
+        print('shiftx aug is disabled')
+        self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
     else:
       data_path = os.path.join(self.data_dir, self.dataset_name, self.input_fname_pattern)
@@ -271,7 +278,7 @@ class DCGAN(object):
         
     if show_img:
         print('Target image:')
-        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=11))
+        self.imshow(self.imgrid(np.uint8(target_fn), cols=11))
 
     if show_mask:
         print('Target mask:')
@@ -334,6 +341,9 @@ class DCGAN(object):
       print(" [!] Load failed...")
 
     for epoch in xrange(config.epoch):
+      if self.augment == True:
+        print('rot2d aug is enabled')
+        self.data_X, self.data_y = self.load_mnist_aug()
       if config.dataset == 'mnist':
         batch_idxs = min(len(self.data_X), config.train_size) // config.batch_size
       else:      
@@ -718,28 +728,13 @@ class DCGAN(object):
         return tf.nn.sigmoid(deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
 
   def load_mnist(self):
-    print('loading mnist...')
+    print('loading mnist without augmenting ...')
     data_dir = os.path.join(self.data_dir, self.dataset_name)
     
     fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
     trX = loaded[16:].reshape((60000,28,28,1)).astype(np.float)
 
-    # here shift train
-    idx = np.random.choice(60000, 50000, replace=False)
-    for i in range(len(idx)):
-        img_test_5px = np.zeros([28,28], dtype= 'float')
-        img_test = trX[idx[i],:,:,0]
-        offset_val = np.random.randint(1, 6)  
-        coin = np.random.uniform(0, 1)
-        if coin <= 0.5:
-            offset_val = -offset_val            
-        if(offset_val > 0):
-            img_test_5px[:,offset_val:] = img_test[:,:-offset_val]
-        else:
-            img_test_5px[:,:28+offset_val] = img_test[:,-offset_val:]
-        trX[idx[i],:,:,0] = img_test_5px
-    
     fd = open(os.path.join(data_dir,'train-labels-idx1-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
     trY = loaded[8:].reshape((60000)).astype(np.float)
@@ -751,22 +746,73 @@ class DCGAN(object):
     fd = open(os.path.join(data_dir,'t10k-labels-idx1-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
     teY = loaded[8:].reshape((10000)).astype(np.float)
+
+    trY = np.asarray(trY)
+    teY = np.asarray(teY)
     
-    # here shfit test
-    idx = np.random.choice(10000, 9000, replace=False)
-    for i in range(len(idx)):
-        img_test_5px = np.zeros([28,28], dtype= 'float')
-        img_test = teX[idx[i],:,:,0]
-        offset_val = np.random.randint(0, 6)  
-        coin = np.random.uniform(0, 1)
-        if coin <= 0.5:
-            offset_val = -offset_val            
-        if(offset_val > 0):
-            img_test_5px[:,offset_val:] = img_test[:,:-offset_val]
-        else:
-            img_test_5px[:,:28+offset_val] = img_test[:,-offset_val:]
-        teX[idx[i],:,:,0] = img_test_5px
+    X = np.concatenate((trX, teX), axis=0)
+    y = np.concatenate((trY, teY), axis=0).astype(np.int)
     
+    seed = 547
+    np.random.seed(seed)
+    np.random.shuffle(X)
+    np.random.seed(seed)
+    np.random.shuffle(y)
+    
+    y_vec = np.zeros((len(y), self.y_dim), dtype=np.float)
+    for i, label in enumerate(y):
+      y_vec[i,y[i]] = 1.0
+    
+    return X/255.,y_vec
+
+ 
+  def load_mnist_aug(self):
+    print('loading mnist and augmenting ...')
+    data_dir = os.path.join('./data', 'mnist')
+
+    fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    trX = loaded[16:].reshape((60000,28,28,1)).astype(np.float)
+
+    num_samples = 50000
+    batch_size = 100
+#     num_samples = 10
+#     batch_size = 10
+    idx = np.random.choice(60000, num_samples, replace=False)
+    print('first 10 idx....', idx[0:10])
+    for batch_start in range(0, num_samples, batch_size):
+        s = slice(batch_start, min(num_samples, batch_start + batch_size))
+        alphas = np.random.randint(-5, 6, size=[(s.stop - s.start),1])
+        target_fn, _ = self.get_target_np(outputs_zs=trX[idx[s],:,:,:], alpha=alphas)
+        if (batch_start > 0) and (batch_start % 10000 == 0):
+            print('Zoom train aug {}% progress'.format(100*batch_start/num_samples))
+        trX[idx[s],:,:,:] = target_fn
+
+    fd = open(os.path.join(data_dir,'train-labels-idx1-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    trY = loaded[8:].reshape((60000)).astype(np.float)
+
+    fd = open(os.path.join(data_dir,'t10k-images-idx3-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    teX = loaded[16:].reshape((10000,28,28,1)).astype(np.float)
+
+    num_samples = 9000
+    batch_size = 100
+#     num_samples = 10
+#     batch_size = 10
+    idx = np.random.choice(10000, num_samples, replace=False)
+    for batch_start in range(0, num_samples, batch_size):
+        s = slice(batch_start, min(num_samples, batch_start + batch_size))
+        alphas = np.random.randint(-5, 6, size=[(s.stop - s.start),1])
+        target_fn, _ = self.get_target_np(outputs_zs=teX[idx[s],:,:,:], alpha=alphas)
+        if (batch_start > 0) and (batch_start % 3000 == 0):
+            print('Zoom test aug {}% progress'.format(100*batch_start/num_samples))
+        teX[idx[s],:,:,:] = target_fn
+        
+    fd = open(os.path.join(data_dir,'t10k-labels-idx1-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    teY = loaded[8:].reshape((10000)).astype(np.float)
+
     trY = np.asarray(trY)
     teY = np.asarray(teY)
     
