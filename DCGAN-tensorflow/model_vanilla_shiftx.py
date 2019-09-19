@@ -84,10 +84,10 @@ class DCGAN(object):
 
     if self.dataset_name == 'mnist':
       if self.augment == True:
-        print('rot2d aug is enabled')
+        print('shiftx aug is enabled')
         self.data_X, self.data_y = self.load_mnist_aug()
       else:
-        print('rot2d aug is disabled')
+        print('shiftx aug is disabled')
         self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
     else:
@@ -292,7 +292,7 @@ class DCGAN(object):
 
     for epoch in xrange(config.epoch):
       if self.augment == True:
-        print('zoom aug is enabled')
+        print('shiftx aug is enabled')
         self.data_X, self.data_y = self.load_mnist_aug()
       if config.dataset == 'mnist':
         batch_idxs = min(len(self.data_X), config.train_size) // config.batch_size
@@ -684,7 +684,7 @@ class DCGAN(object):
         alphas = np.random.randint(-14, 15, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=trX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 10000 == 0):
-            print('Zoom train aug {}% progress'.format(100*batch_start/num_samples))
+            print('shiftx train aug {}% progress'.format(100*batch_start/num_samples))
         trX[idx[s],:,:,:] = target_fn
 
     fd = open(os.path.join(data_dir,'train-labels-idx1-ubyte'))
@@ -705,7 +705,7 @@ class DCGAN(object):
         alphas = np.random.randint(-14, 15, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=teX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 3000 == 0):
-            print('Zoom test aug {}% progress'.format(100*batch_start/num_samples))
+            print('shiftx test aug {}% progress'.format(100*batch_start/num_samples))
         teX[idx[s],:,:,:] = target_fn
         
     fd = open(os.path.join(data_dir,'t10k-labels-idx1-ubyte'))
