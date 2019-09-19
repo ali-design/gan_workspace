@@ -110,6 +110,8 @@ class DCGAN(object):
     self.build_model()
 
   def build_model(self):
+    print('Building model_vanilla_shiftx ...')
+
     if self.y_dim:
       self.y = tf.placeholder(tf.float32, [self.batch_size, self.y_dim], name='y')
     else:
@@ -679,7 +681,7 @@ class DCGAN(object):
     print('first 10 idx....', idx[0:10])
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
-        alphas = np.random.randint(-5, 6, size=[(s.stop - s.start),1])
+        alphas = np.random.randint(-14, 15, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=trX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 10000 == 0):
             print('Zoom train aug {}% progress'.format(100*batch_start/num_samples))
@@ -700,7 +702,7 @@ class DCGAN(object):
     idx = np.random.choice(10000, num_samples, replace=False)
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
-        alphas = np.random.randint(-5, 6, size=[(s.stop - s.start),1])
+        alphas = np.random.randint(-14, 15, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=teX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 3000 == 0):
             print('Zoom test aug {}% progress'.format(100*batch_start/num_samples))

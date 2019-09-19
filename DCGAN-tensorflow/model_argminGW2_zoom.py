@@ -114,6 +114,7 @@ class DCGAN(object):
     self.build_model()
 
   def build_model(self):
+    print('Building model_argminGW2_zoom ...')
     # Lets first define our placeholders and vars:
     self.img_size = 28
     self.Nsliders = 1

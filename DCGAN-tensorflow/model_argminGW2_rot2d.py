@@ -115,6 +115,7 @@ class DCGAN(object):
     self.build_model()
 
   def build_model(self):
+    print('Building model_argminGW2_rot2d ...')
     # Lets first define our placeholders and vars:
     self.Nsliders = 1
     img_size = self.img_size

@@ -110,6 +110,7 @@ class DCGAN(object):
     self.build_model()
 
   def build_model(self):
+    print('model_vanilla_rot2d ...') 
     if self.y_dim:
       self.y = tf.placeholder(tf.float32, [self.batch_size, self.y_dim], name='y')
     else:

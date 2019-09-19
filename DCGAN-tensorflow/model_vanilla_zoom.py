@@ -109,6 +109,7 @@ class DCGAN(object):
     self.build_model()
 
   def build_model(self):
+    print('Building model_vanilla_zoom ...')
     if self.y_dim:
       self.y = tf.placeholder(tf.float32, [self.batch_size, self.y_dim], name='y')
     else:

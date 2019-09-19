@@ -11,7 +11,8 @@ import importlib
 flags = tf.app.flags
 flags.DEFINE_string("transform_type", "zoom", "The name of dataset [zoom, shiftx, shifty, rot2d]")
 flags.DEFINE_boolean("steer", False, "True for traning argminGW, False for training vanilla G")
-flags.DEFINE_integer("epoch", 25, "Epoch to train [25]")
+flags.DEFINE_boolean("aug", False, "True for enabling transformation augmentation")
+flags.DEFINE_integer("epoch", 50, "Epoch to train [25]")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
 flags.DEFINE_float("train_size", np.inf, "The size of train images [np.inf]")
@@ -21,7 +22,6 @@ flags.DEFINE_integer("input_width", None, "The size of image to use (will be cen
 flags.DEFINE_integer("output_height", 64, "The size of the output images to produce [64]")
 flags.DEFINE_integer("output_width", None, "The size of the output images to produce. If None, same value as output_height [None]")
 flags.DEFINE_string("dataset", "celebA", "The name of dataset [celebA, mnist, lsun]")
-flags.DEFINE_boolean("aug", False, "True for enabling transformation augmentation")
 flags.DEFINE_string("input_fname_pattern", "*.jpg", "Glob pattern of filename of input images [*]")
 flags.DEFINE_string("data_dir", "./data", "path to datasets [e.g. $HOME/data]")
 flags.DEFINE_string("out_dir", "./out", "Root directory for outputs [e.g. $HOME/out]")
@@ -45,19 +45,59 @@ FLAGS = flags.FLAGS
 def main(_):
   pp.pprint(flags.FLAGS.__flags)
    
-  if FLAGS.steer:
-    print('Training with steerable G -> loading model_argminGW2_{} ...'.format(FLAGS.transform_type))
-    DCGAN = getattr(importlib.import_module('model_argminGW2_{}'.format(FLAGS.transform_type)), 'DCGAN')
-  else:
-    print('Training vanilla G -> loading model_vanilla_{} ...'.format(FLAGS.transform_type))
-    DCGAN = getattr(importlib.import_module('model_vanilla_{}'.format(FLAGS.transform_type)), 'DCGAN')
+#   if FLAGS.steer:
+#     print('Training with steerable G -> loading model_argminGW2_{} ...'.format(FLAGS.transform_type))
+#     DCGAN = getattr(importlib.import_module('model_argminGW2_{}'.format(FLAGS.transform_type)), 'DCGAN')
+#   else:
+#     print('Training vanilla G -> loading model_vanilla_{} ...'.format(FLAGS.transform_type))
+#     DCGAN = getattr(importlib.import_module('model_vanilla_{}'.format(FLAGS.transform_type)), 'DCGAN')
 
-
+  print('Training with steerable G for {} transformation ...'.format(FLAGS.transform_type))
+  if FLAGS.transform_type == 'zoom':
+    if FLAGS.steer:
+      from model_argminGW2_zoom import DCGAN
+    else: 
+      from model_vanilla_zoom import DCGAN
+        
+   if FLAGS.transform_type == 'shiftx':
+    if FLAGS.steer:
+      from model_argminGW2_shiftx import DCGAN
+    else: 
+      from model_vanilla_shiftx import DCGAN
     
+  if FLAGS.transform_type == 'shifty':
+    if FLAGS.steer:
+      from model_argminGW2_shifty import DCGAN
+    else: 
+      from model_vanilla_shifty import DCGAN
+    
+  if FLAGS.transform_type == 'rot2d':
+    if FLAGS.steer:
+      from model_argminGW2_rot2d import DCGAN
+    else: 
+      from model_vanilla_rot2d import DCGAN
+    
+  augment_flag_str = 'NoAug'
+  if FLAGS.aug:
+    augment_flag_str = 'aug'
+  
+  steer_flag_str = 'vanilla'
+  if FLAGS.steer:
+    steer_flag_str = 'argminGW'
+  else:
+    if FLAGS.aug:
+        steer_flag_str = 'argminW'
+
+  if FLAGS.out_name:
+    FLAGS.out_name = expand_path(FLAGS.out_name)
+  else:
+    FLAGS.out_name = FLAGS.transform_type + '_' + augment_flag_str + '_' + steer_flag_str + '_lr' + str(learning_rate)
+  print('Results will be saved in {}'.format(FLAGS.out_name))
+
   # expand user name and environment variables
   FLAGS.data_dir = expand_path(FLAGS.data_dir)
   FLAGS.out_dir = expand_path(FLAGS.out_dir)
-  FLAGS.out_name = expand_path(FLAGS.out_name)
+#   FLAGS.out_name = expand_path(FLAGS.out_name)
   FLAGS.checkpoint_dir = expand_path(FLAGS.checkpoint_dir)
   FLAGS.sample_dir = expand_path(FLAGS.sample_dir)
 

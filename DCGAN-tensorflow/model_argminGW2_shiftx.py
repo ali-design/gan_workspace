@@ -115,6 +115,7 @@ class DCGAN(object):
     self.build_model()
 
   def build_model(self):
+    print('Building model_argminGW2_shiftx ...')
     # Lets first define our placeholders and vars:
     self.img_size = 28
     self.Nsliders = 1
@@ -376,7 +377,7 @@ class DCGAN(object):
 
         if config.dataset == 'mnist':
             
-          alpha_vals = np.random.randint(-5, 6, size=[config.batch_size,1])  
+          alpha_vals = np.random.randint(-14, 15, size=[config.batch_size,1])  
 #           alpha_vals = np.zeros([config.batch_size,1])
 #           test_alpha, test_w = self.sess.run([self.alpha, self.w], feed_dict={self.alpha: alpha_vals})
           out_zs = self.sampler.eval({ self.z: batch_z, self.y: batch_labels })
@@ -484,7 +485,7 @@ class DCGAN(object):
 
         if np.mod(counter, config.sample_freq) == 0:
           if config.dataset == 'mnist':
-            sample_alpha = np.random.randint(-5, 6, size=[config.batch_size,1])  
+            sample_alpha = np.random.randint(-14, 15, size=[config.batch_size,1])  
 #             sample_alpha = np.zeros([config.batch_size,1])
             sample_out_zs = self.sampler.eval({ self.z: sample_z, self.y: sample_labels })
             sample_target_fn, sample_mask_fn = self.get_target_np(sample_out_zs, sample_alpha)#, show_img=True, show_mask=True)
@@ -782,7 +783,7 @@ class DCGAN(object):
     print('first 10 idx....', idx[0:10])
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
-        alphas = np.random.randint(-5, 6, size=[(s.stop - s.start),1])
+        alphas = np.random.randint(-14, 15, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=trX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 10000 == 0):
             print('Zoom train aug {}% progress'.format(100*batch_start/num_samples))
@@ -803,7 +804,7 @@ class DCGAN(object):
     idx = np.random.choice(10000, num_samples, replace=False)
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
-        alphas = np.random.randint(-5, 6, size=[(s.stop - s.start),1])
+        alphas = np.random.randint(-14, 15, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=teX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 3000 == 0):
             print('Zoom test aug {}% progress'.format(100*batch_start/num_samples))
