@@ -59,7 +59,7 @@ def main(_):
     else: 
       from model_vanilla_zoom import DCGAN
         
-   if FLAGS.transform_type == 'shiftx':
+  if FLAGS.transform_type == 'shiftx':
     if FLAGS.steer:
       from model_argminGW2_shiftx import DCGAN
     else: 
@@ -91,7 +91,7 @@ def main(_):
   if FLAGS.out_name:
     FLAGS.out_name = expand_path(FLAGS.out_name)
   else:
-    FLAGS.out_name = FLAGS.transform_type + '_' + augment_flag_str + '_' + steer_flag_str + '_lr' + str(learning_rate)
+    FLAGS.out_name = FLAGS.transform_type + '_' + augment_flag_str + '_' + steer_flag_str + '_lr' + str(FLAGS.learning_rate)
   print('Results will be saved in {}'.format(FLAGS.out_name))
 
   # expand user name and environment variables
