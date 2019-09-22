@@ -28,7 +28,7 @@ class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=64,
-         gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default', aug=False,
+         gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default', aug=False, alpha_max=5,
          max_to_keep=1,
          input_fname_pattern='*.jpg', checkpoint_dir='ckpts', sample_dir='samples', out_dir='./out', data_dir='./data'):
     """
@@ -79,6 +79,7 @@ class DCGAN(object):
     if not self.y_dim:
       self.g_bn3 = batch_norm(name='g_bn3')
 
+    self.alpha_max = alpha_max
     self.augment = aug
     self.dataset_name = dataset_name
     self.input_fname_pattern = input_fname_pattern
@@ -377,7 +378,8 @@ class DCGAN(object):
 
         if config.dataset == 'mnist':
             
-          alpha_vals = np.random.randint(-14, 15, size=[config.batch_size,1])  
+          alpha_vals = np.random.randint(-self.alpha_max, self.alpha_max+1, size=[config.batch_size,1])  
+
 #           alpha_vals = np.zeros([config.batch_size,1])
 #           test_alpha, test_w = self.sess.run([self.alpha, self.w], feed_dict={self.alpha: alpha_vals})
           out_zs = self.sampler.eval({ self.z: batch_z, self.y: batch_labels })
@@ -485,13 +487,14 @@ class DCGAN(object):
 
         if np.mod(counter, config.sample_freq) == 0:
           if config.dataset == 'mnist':
-            sample_alpha = np.random.randint(-14, 15, size=[config.batch_size,1])  
+            sample_alpha = np.random.randint(-self.alpha_max, self.alpha_max+1, size=[config.batch_size,1]) 
+            
 #             sample_alpha = np.zeros([config.batch_size,1])
             sample_out_zs = self.sampler.eval({ self.z: sample_z, self.y: sample_labels })
             sample_target_fn, sample_mask_fn = self.get_target_np(sample_out_zs, sample_alpha)#, show_img=True, show_mask=True)
             
-            samples, d_loss, g_loss, walk_loss = self.sess.run(
-              [self.sampler, self.d_loss, self.g_loss, self.walk_loss],
+            samples_new, samples, d_loss, g_loss, walk_loss = self.sess.run(
+              [self.sampler_new, self.sampler, self.d_loss, self.g_loss, self.walk_loss],
               feed_dict={
                   self.z: sample_z,
                   self.inputs: sample_inputs,
@@ -503,6 +506,8 @@ class DCGAN(object):
             )
             save_images(samples, image_manifold_size(samples.shape[0]),
                   './{}/train_{:08d}.png'.format(config.sample_dir, counter))
+            save_images(samples_new, image_manifold_size(samples_new.shape[0]),
+                  './{}/train_{:08d}_new.png'.format(config.sample_dir, counter))            
 #             print("[Sample] d_loss: %.8f, g_loss: %.8f, w_loss: %.8f" % (d_loss, g_loss, walk_loss)) 
             print("[Sample] d_loss: {}, g_loss: {}, w_loss: {}".format(d_loss, g_loss, walk_loss))
           else:
@@ -783,7 +788,7 @@ class DCGAN(object):
     print('first 10 idx....', idx[0:10])
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
-        alphas = np.random.randint(-14, 15, size=[(s.stop - s.start),1])
+        alphas = np.random.randint(-self.alpha_max, self.alpha_max+1, size=[(s.stop - s.start),1])        
         target_fn, _ = self.get_target_np(outputs_zs=trX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 10000 == 0):
             print('shiftx train aug {}% progress'.format(100*batch_start/num_samples))
@@ -804,7 +809,7 @@ class DCGAN(object):
     idx = np.random.choice(10000, num_samples, replace=False)
     for batch_start in range(0, num_samples, batch_size):
         s = slice(batch_start, min(num_samples, batch_start + batch_size))
-        alphas = np.random.randint(-14, 15, size=[(s.stop - s.start),1])
+        alphas = np.random.randint(-self.alpha_max, self.alpha_max+1, size=[(s.stop - s.start),1])
         target_fn, _ = self.get_target_np(outputs_zs=teX[idx[s],:,:,:], alpha=alphas)
         if (batch_start > 0) and (batch_start % 3000 == 0):
             print('shiftx test aug {}% progress'.format(100*batch_start/num_samples))

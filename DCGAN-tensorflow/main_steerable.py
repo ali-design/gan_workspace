@@ -7,10 +7,12 @@ from utils import pp, visualize, to_json, show_all_variables, expand_path, times
 
 import tensorflow as tf
 import importlib
+import time
 
 flags = tf.app.flags
 flags.DEFINE_string("transform_type", "zoom", "The name of dataset [zoom, shiftx, shifty, rot2d]")
 flags.DEFINE_boolean("steer", False, "True for traning argminGW, False for training vanilla G")
+flags.DEFINE_integer("alpha_max", 5, "max of alpha for steering")
 flags.DEFINE_boolean("aug", False, "True for enabling transformation augmentation")
 flags.DEFINE_integer("epoch", 100, "Epoch to train [25]")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
@@ -30,7 +32,7 @@ flags.DEFINE_string("out_dir", "./out", "Root directory for outputs [e.g. $HOME/
 flags.DEFINE_string("out_name", "", "Folder (under out_root_dir) for all outputs. Generated automatically if left blank []")
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Folder (under out_root_dir/out_name) to save checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "samples", "Folder (under out_root_dir/out_name) to save samples [samples]")
-flags.DEFINE_boolean("train", False, "True for training, False for testing [False]")
+flags.DEFINE_boolean("train", False, "For us this is always train mode, either true of false flag")
 flags.DEFINE_boolean("crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
 flags.DEFINE_boolean("export", False, "True for exporting with new batch size")
@@ -95,7 +97,8 @@ def main(_):
   if FLAGS.out_name:
     FLAGS.out_name = expand_path(FLAGS.out_name)
   else:
-    FLAGS.out_name = FLAGS.transform_type + '_' + augment_flag_str + '_' + steer_flag_str + '_lr' + str(FLAGS.learning_rate)
+    FLAGS.out_name = FLAGS.transform_type+'_'+augment_flag_str+'_'+steer_flag_str+\
+                     '_alphamax'+str(FLAGS.alpha_max)+'_lr'+ str(FLAGS.learning_rate)
   print('Results will be saved in {}'.format(FLAGS.out_name))
 
   # expand user name and environment variables
@@ -145,6 +148,7 @@ def main(_):
           z_dim=FLAGS.z_dim,
           dataset_name=FLAGS.dataset,
           aug=FLAGS.aug,
+          alpha_max=FLAGS.alpha_max,
           input_fname_pattern=FLAGS.input_fname_pattern,
           crop=FLAGS.crop,
           checkpoint_dir=FLAGS.checkpoint_dir,
@@ -175,8 +179,12 @@ def main(_):
     show_all_variables()
 
     if FLAGS.train:
+      print('>>>---Traning mode is set to {}---<<<'.format(FLAGS.train))
+      time.sleep(10)
       dcgan.train(FLAGS)
     else:
+      print('<<<---Testing mode--->>>')
+      time.sleep(10)  
       load_success, load_counter = dcgan.load(FLAGS.checkpoint_dir)
       if not load_success:
         raise Exception("Checkpoint not found in " + FLAGS.checkpoint_dir)
