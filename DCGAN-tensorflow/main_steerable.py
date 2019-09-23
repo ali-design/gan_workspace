@@ -12,9 +12,9 @@ import time
 flags = tf.app.flags
 flags.DEFINE_string("transform_type", "zoom", "The name of dataset [zoom, shiftx, shifty, rot2d]")
 flags.DEFINE_boolean("steer", False, "True for traning argminGW, False for training vanilla G")
-flags.DEFINE_integer("alpha_max", 5, "max of alpha for steering")
+flags.DEFINE_float("alpha_max", 5, "max of alpha for steering")
 flags.DEFINE_boolean("aug", False, "True for enabling transformation augmentation")
-flags.DEFINE_integer("epoch", 100, "Epoch to train [25]")
+flags.DEFINE_integer("epoch", 75, "Epoch to train [25]")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
 flags.DEFINE_float("train_size", np.inf, "The size of train images [np.inf]")
@@ -50,7 +50,7 @@ def main(_):
   pp.pprint(flags.FLAGS.__flags)
 
   FLAGS.train = True
-   
+  alpha_max_str = str(FLAGS.alpha_max)
 #   if FLAGS.steer:
 #     print('Training with steerable G -> loading model_argminGW2_{} ...'.format(FLAGS.transform_type))
 #     DCGAN = getattr(importlib.import_module('model_argminGW2_{}'.format(FLAGS.transform_type)), 'DCGAN')
@@ -66,18 +66,21 @@ def main(_):
       from model_vanilla_zoom import DCGAN
         
   if FLAGS.transform_type == 'shiftx':
+    alpha_max_str = str(np.uint8(FLAGS.alpha_max))
     if FLAGS.steer:
       from model_argminGW2_shiftx import DCGAN
     else: 
       from model_vanilla_shiftx import DCGAN
     
   if FLAGS.transform_type == 'shifty':
+    alpha_max_str = str(np.uint8(FLAGS.alpha_max))
     if FLAGS.steer:
       from model_argminGW2_shifty import DCGAN
     else: 
       from model_vanilla_shifty import DCGAN
     
   if FLAGS.transform_type == 'rot2d':
+    alpha_max_str = str(np.uint8(FLAGS.alpha_max))
     if FLAGS.steer:
       from model_argminGW2_rot2d import DCGAN
     else: 
@@ -98,7 +101,7 @@ def main(_):
     FLAGS.out_name = expand_path(FLAGS.out_name)
   else:
     FLAGS.out_name = FLAGS.transform_type+'_'+augment_flag_str+'_'+steer_flag_str+\
-                     '_alphamax'+str(FLAGS.alpha_max)+'_lr'+ str(FLAGS.learning_rate)
+                     '_alphamax'+alpha_max_str+'_lr'+ str(FLAGS.learning_rate)
   print('Results will be saved in {}'.format(FLAGS.out_name))
 
   # expand user name and environment variables

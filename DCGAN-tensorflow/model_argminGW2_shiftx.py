@@ -280,7 +280,8 @@ class DCGAN(object):
         
     if show_img:
         print('Target image:')
-        self.imshow(self.imgrid(np.uint8(target_fn), cols=11))
+        ## ToDo: this won't show well for load_aug:
+        self.imshow(self.imgrid(np.uint8(target_fn*255), cols=11))
 
     if show_mask:
         print('Target mask:')
@@ -404,14 +405,6 @@ class DCGAN(object):
           self.writer.add_summary(summary_str, counter)
 
           # Update G network
-          summary_w_optim = self.sess.run(w_optim,
-            feed_dict={
-              self.z: batch_z, 
-              self.y:batch_labels,
-              self.target:target_fn,
-              self.mask:mask_fn,
-              self.alpha:alpha_vals                
-            })
           _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={
               self.z: batch_z, 
@@ -421,18 +414,25 @@ class DCGAN(object):
               self.alpha:alpha_vals                
             })
           self.writer.add_summary(summary_str, counter)
-
-          # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-          summary_w_optim = self.sess.run(w_optim,
-            feed_dict={ self.z: batch_z, self.y:batch_labels, self.target:target_fn,
-                        self.mask:mask_fn,
-                        self.alpha:alpha_vals})              
-          _, summary_str, summary_w_optim = self.sess.run([g_optim, self.g_sum, w_optim],
+          w_optim_np = self.sess.run(w_optim,
+            feed_dict={
+              self.z: batch_z, 
+              self.y:batch_labels,
+              self.target:target_fn,
+              self.mask:mask_fn,
+              self.alpha:alpha_vals                
+            })
+          # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)          
+          _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={ self.z: batch_z, self.y:batch_labels, self.target:target_fn,
                         self.mask:mask_fn,
                         self.alpha:alpha_vals})
           self.writer.add_summary(summary_str, counter)
-          
+          w_optim_np = self.sess.run(w_optim,
+            feed_dict={ self.z: batch_z, self.y:batch_labels, self.target:target_fn,
+                        self.mask:mask_fn,
+                        self.alpha:alpha_vals})    
+        
           errD_fake = self.d_loss_fake.eval({
               self.z: batch_z, 
               self.y:batch_labels,
@@ -447,13 +447,6 @@ class DCGAN(object):
               self.mask:mask_fn,
               self.alpha:alpha_vals              
           })
-          errWalk = self.walk_loss.eval({
-              self.z: batch_z,
-              self.y: batch_labels,
-              self.target:target_fn,
-              self.mask:mask_fn,
-              self.alpha:alpha_vals
-          })
           errG = self.g_loss.eval({
               self.z: batch_z,
               self.y: batch_labels,
@@ -461,6 +454,13 @@ class DCGAN(object):
               self.mask:mask_fn,
               self.alpha:alpha_vals
           })
+          errWalk = self.walk_loss.eval({
+              self.z: batch_z,
+              self.y: batch_labels,
+              self.target:target_fn,
+              self.mask:mask_fn,
+              self.alpha:alpha_vals
+          })            
         else:
           # Update D network
           _, summary_str = self.sess.run([d_optim, self.d_sum],
@@ -468,12 +468,12 @@ class DCGAN(object):
           self.writer.add_summary(summary_str, counter)
 
           # Update G network
-          _, summary_str, summary_w_optim = self.sess.run([g_optim, self.g_sum, w_optim],
+          _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={ self.z: batch_z })
           self.writer.add_summary(summary_str, counter)
 
           # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-          _, summary_str, summary_w_optim = self.sess.run([g_optim, self.g_sum, w_optim],
+          _, summary_str= self.sess.run([g_optim, self.g_sum],
             feed_dict={ self.z: batch_z })
           self.writer.add_summary(summary_str, counter)
           
@@ -488,8 +488,6 @@ class DCGAN(object):
         if np.mod(counter, config.sample_freq) == 0:
           if config.dataset == 'mnist':
             sample_alpha = np.random.randint(-self.alpha_max, self.alpha_max+1, size=[config.batch_size,1]) 
-            
-#             sample_alpha = np.zeros([config.batch_size,1])
             sample_out_zs = self.sampler.eval({ self.z: sample_z, self.y: sample_labels })
             sample_target_fn, sample_mask_fn = self.get_target_np(sample_out_zs, sample_alpha)#, show_img=True, show_mask=True)
             
