@@ -439,7 +439,7 @@ class DCGAN(object):
               self.alpha:alpha_vals                
             })
           # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)            
-          _, summary_str, summary_w_optim = self.sess.run([g_optim, self.g_sum, w_optim],
+          _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={ self.z: batch_z, self.y:batch_labels, self.target:target_fn,
                         self.mask:mask_fn,
                         self.alpha:alpha_vals})
